@@ -32,16 +32,50 @@ interface SessionStorageInterface
      *
      * @api
      */
-    function start();
+    public function start();
+
+    /**
+     * Checks if the session is started.
+     *
+     * @return boolean True if started, false otherwise.
+     */
+    public function isStarted();
 
     /**
      * Returns the session ID
      *
-     * @return mixed The session ID or false if the session has not started.
+     * @return string The session ID or empty.
      *
      * @api
      */
-    function getId();
+    public function getId();
+
+    /**
+     * Sets the session ID
+     *
+     * @param string $id
+     *
+     * @api
+     */
+    public function setId($id);
+
+    /**
+     * Returns the session name
+     *
+     * @return mixed The session name.
+     *
+     * @api
+     */
+    public function getName();
+
+    /**
+     * Sets the session name
+     *
+     * @param string $name
+     *
+     * @api
+     */
+    public function setName($name);
 
     /**
      * Regenerates id that represents this storage.
@@ -51,7 +85,14 @@ interface SessionStorageInterface
      * or functional testing where a real PHP session would interfere
      * with testing.
      *
-     * @param  Boolean $destroy Destroy session when regenerating?
+     * Note regenerate+destroy should not clear the session data in memory
+     * only delete the session data from persistent storage.
+     *
+     * @param Boolean $destroy  Destroy session when regenerating?
+     * @param integer $lifetime Sets the cookie lifetime for the session cookie. A null value
+     *                          will leave the system settings unchanged, 0 sets the cookie
+     *                          to expire with browser session. Time is in seconds, and is
+     *                          not a Unix timestamp.
      *
      * @return Boolean True if session regenerated, false if error
      *
@@ -59,7 +100,7 @@ interface SessionStorageInterface
      *
      * @api
      */
-    function regenerate($destroy = false);
+    public function regenerate($destroy = false, $lifetime = null);
 
     /**
      * Force the session to be saved and closed.
@@ -68,13 +109,16 @@ interface SessionStorageInterface
      * used for a storage object design for unit or functional testing where
      * a real PHP session would interfere with testing, in which case it
      * it should actually persist the session data if required.
+     *
+     * @throws \RuntimeException If the session is saved without being started, or if the session
+     *                           is already closed.
      */
-    function save();
+    public function save();
 
     /**
      * Clear all session data in memory.
      */
-    function clear();
+    public function clear();
 
     /**
      * Gets a SessionBagInterface by name.
@@ -85,12 +129,17 @@ interface SessionStorageInterface
      *
      * @throws \InvalidArgumentException If the bag does not exist
      */
-    function getBag($name);
+    public function getBag($name);
 
     /**
      * Registers a SessionBagInterface for use.
      *
      * @param SessionBagInterface $bag
      */
-    function registerBag(SessionBagInterface $bag);
+    public function registerBag(SessionBagInterface $bag);
+
+    /**
+     * @return MetadataBag
+     */
+    public function getMetadataBag();
 }

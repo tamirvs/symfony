@@ -12,10 +12,15 @@
 namespace Symfony\Component\Form\Extension\Csrf\EventListener;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\Form\Exception\UnexpectedTypeException;
+use Symfony\Component\Form\Extension\Csrf\CsrfProvider\CsrfProviderAdapter;
+use Symfony\Component\Form\Extension\Csrf\CsrfProvider\CsrfProviderInterface;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormError;
-use Symfony\Component\Form\Event\DataEvent;
-use Symfony\Component\Form\Extension\Csrf\CsrfProvider\CsrfProviderInterface;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Security\Csrf\CsrfToken;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Translation\TranslatorInterface;
 
 /**
  * @author Bernhard Schussek <bschussek@gmail.com>
@@ -23,46 +28,98 @@ use Symfony\Component\Form\Extension\Csrf\CsrfProvider\CsrfProviderInterface;
 class CsrfValidationListener implements EventSubscriberInterface
 {
     /**
-     * The provider for generating and validating CSRF tokens
-     * @var CsrfProviderInterface
+     * The name of the CSRF field
+     * @var string
      */
-    private $csrfProvider;
+    private $fieldName;
 
     /**
-     * A text mentioning the intention of the CSRF token
+     * The generator for CSRF tokens
+     * @var CsrfTokenManagerInterface
+     */
+    private $tokenManager;
+
+    /**
+     * A text mentioning the tokenId of the CSRF token
      *
      * Validation of the token will only succeed if it was generated in the
-     * same session and with the same intention.
+     * same session and with the same tokenId.
      *
      * @var string
      */
-    private $intention;
+    private $tokenId;
 
-    static public function getSubscribedEvents()
+    /**
+     * The message displayed in case of an error.
+     * @var string
+     */
+    private $errorMessage;
+
+    /**
+     * @var TranslatorInterface
+     */
+    private $translator;
+
+    /**
+     * @var null|string
+     */
+    private $translationDomain;
+
+    public static function getSubscribedEvents()
     {
         return array(
-            FormEvents::BIND_CLIENT_DATA => 'onBindClientData',
+            FormEvents::PRE_SUBMIT => 'preSubmit',
         );
     }
 
-    public function __construct(CsrfProviderInterface $csrfProvider, $intention)
+    public function __construct($fieldName, $tokenManager, $tokenId, $errorMessage, TranslatorInterface $translator = null, $translationDomain = null)
     {
-        $this->csrfProvider = $csrfProvider;
-        $this->intention = $intention;
+        if ($tokenManager instanceof CsrfProviderInterface) {
+            $tokenManager = new CsrfProviderAdapter($tokenManager);
+        } elseif (!$tokenManager instanceof CsrfTokenManagerInterface) {
+            throw new UnexpectedTypeException($tokenManager, 'CsrfProviderInterface or CsrfTokenManagerInterface');
+        }
+
+        $this->fieldName = $fieldName;
+        $this->tokenManager = $tokenManager;
+        $this->tokenId = $tokenId;
+        $this->errorMessage = $errorMessage;
+        $this->translator = $translator;
+        $this->translationDomain = $translationDomain;
     }
 
-    public function onBindClientData(DataEvent $event)
+    public function preSubmit(FormEvent $event)
     {
         $form = $event->getForm();
         $data = $event->getData();
 
-        if ((!$form->hasParent() || $form->getParent()->isRoot())
-            && !$this->csrfProvider->isCsrfTokenValid($this->intention, $data)) {
-            $form->addError(new FormError('The CSRF token is invalid. Please try to resubmit the form'));
+        if ($form->isRoot() && $form->getConfig()->getOption('compound')) {
+            if (!isset($data[$this->fieldName]) || !$this->tokenManager->isTokenValid(new CsrfToken($this->tokenId, $data[$this->fieldName]))) {
+                $errorMessage = $this->errorMessage;
 
-            // If the session timed out, the token is invalid now.
-            // Regenerate the token so that a resubmission is possible.
-            $event->setData($this->csrfProvider->generateCsrfToken($this->intention));
+                if (null !== $this->translator) {
+                    $errorMessage = $this->translator->trans($errorMessage, array(), $this->translationDomain);
+                }
+
+                $form->addError(new FormError($errorMessage));
+            }
+
+            if (is_array($data)) {
+                unset($data[$this->fieldName]);
+            }
         }
+
+        $event->setData($data);
+    }
+
+    /**
+     * Alias of {@link preSubmit()}.
+     *
+     * @deprecated Deprecated since version 2.3, to be removed in 3.0. Use
+     *             {@link preSubmit()} instead.
+     */
+    public function preBind(FormEvent $event)
+    {
+        $this->preSubmit($event);
     }
 }

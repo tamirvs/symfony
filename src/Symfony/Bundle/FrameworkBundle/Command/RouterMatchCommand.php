@@ -14,6 +14,7 @@ namespace Symfony\Bundle\FrameworkBundle\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Routing\Matcher\TraceableUrlMatcher;
 
@@ -25,7 +26,7 @@ use Symfony\Component\Routing\Matcher\TraceableUrlMatcher;
 class RouterMatchCommand extends ContainerAwareCommand
 {
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function isEnabled()
     {
@@ -41,27 +42,27 @@ class RouterMatchCommand extends ContainerAwareCommand
     }
 
     /**
-     * @see Command
+     * {@inheritdoc}
      */
     protected function configure()
     {
         $this
+            ->setName('router:match')
             ->setDefinition(array(
                 new InputArgument('path_info', InputArgument::REQUIRED, 'A path info'),
             ))
-            ->setName('router:match')
             ->setDescription('Helps debug routes by simulating a path info match')
             ->setHelp(<<<EOF
-The <info>router:match</info> simulates a path info match:
+The <info>%command.name%</info> simulates a path info match:
 
-  <info>router:match /foo</info>
+  <info>php %command.full_name% /foo</info>
 EOF
             )
         ;
     }
 
     /**
-     * @see Command
+     * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -76,6 +77,11 @@ EOF
                 $output->writeln(sprintf('<fg=yellow>Route "%s" almost matches but %s</>', $trace['name'], lcfirst($trace['log'])));
             } elseif (TraceableUrlMatcher::ROUTE_MATCHES == $trace['level']) {
                 $output->writeln(sprintf('<fg=green>Route "%s" matches</>', $trace['name']));
+
+                $routerDebugcommand = $this->getApplication()->find('router:debug');
+                $output->writeln('');
+                $routerDebugcommand->run(new ArrayInput(array('name' => $trace['name'])), $output);
+
                 $matches = true;
             } elseif ($input->getOption('verbose')) {
                 $output->writeln(sprintf('Route "%s" does not match: %s', $trace['name'], $trace['log']));
@@ -84,6 +90,8 @@ EOF
 
         if (!$matches) {
             $output->writeln('<fg=red>None of the routes matches</>');
+
+            return 1;
         }
     }
 }

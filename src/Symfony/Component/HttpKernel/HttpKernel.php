@@ -13,13 +13,16 @@ namespace Symfony\Component\HttpKernel;
 
 use Symfony\Component\HttpKernel\Controller\ControllerResolverInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\Event\GetResponseForControllerResultEvent;
 use Symfony\Component\HttpKernel\Event\GetResponseForExceptionEvent;
 use Symfony\Component\HttpKernel\Event\PostResponseEvent;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -32,37 +35,28 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 class HttpKernel implements HttpKernelInterface, TerminableInterface
 {
-    private $dispatcher;
-    private $resolver;
+    protected $dispatcher;
+    protected $resolver;
+    protected $requestStack;
 
     /**
      * Constructor
      *
-     * @param EventDispatcherInterface    $dispatcher An EventDispatcherInterface instance
-     * @param ControllerResolverInterface $resolver   A ControllerResolverInterface instance
+     * @param EventDispatcherInterface    $dispatcher   An EventDispatcherInterface instance
+     * @param ControllerResolverInterface $resolver     A ControllerResolverInterface instance
+     * @param RequestStack                $requestStack A stack for master/sub requests
      *
      * @api
      */
-    public function __construct(EventDispatcherInterface $dispatcher, ControllerResolverInterface $resolver)
+    public function __construct(EventDispatcherInterface $dispatcher, ControllerResolverInterface $resolver, RequestStack $requestStack = null)
     {
         $this->dispatcher = $dispatcher;
         $this->resolver = $resolver;
+        $this->requestStack = $requestStack ?: new RequestStack();
     }
 
     /**
-     * Handles a Request to convert it to a Response.
-     *
-     * When $catch is true, the implementation must catch all exceptions
-     * and do its best to convert them to a Response instance.
-     *
-     * @param  Request $request A Request instance
-     * @param  integer $type    The type of the request
-     *                          (one of HttpKernelInterface::MASTER_REQUEST or HttpKernelInterface::SUB_REQUEST)
-     * @param  Boolean $catch   Whether to catch exceptions or not
-     *
-     * @return Response A Response instance
-     *
-     * @throws \Exception When an Exception occurs during processing
+     * {@inheritdoc}
      *
      * @api
      */
@@ -72,6 +66,8 @@ class HttpKernel implements HttpKernelInterface, TerminableInterface
             return $this->handleRaw($request, $type);
         } catch (\Exception $e) {
             if (false === $catch) {
+                $this->finishRequest($request, $type);
+
                 throw $e;
             }
 
@@ -104,6 +100,8 @@ class HttpKernel implements HttpKernelInterface, TerminableInterface
      */
     private function handleRaw(Request $request, $type = self::MASTER_REQUEST)
     {
+        $this->requestStack->push($request);
+
         // request
         $event = new GetResponseEvent($this, $request, $type);
         $this->dispatcher->dispatch(KernelEvents::REQUEST, $event);
@@ -154,7 +152,7 @@ class HttpKernel implements HttpKernelInterface, TerminableInterface
      * Filters a response object.
      *
      * @param Response $response A Response instance
-     * @param Request  $request  A error message in case the response is not a Response object
+     * @param Request  $request  An error message in case the response is not a Response object
      * @param integer  $type     The type of the request (one of HttpKernelInterface::MASTER_REQUEST or HttpKernelInterface::SUB_REQUEST)
      *
      * @return Response The filtered Response instance
@@ -167,31 +165,74 @@ class HttpKernel implements HttpKernelInterface, TerminableInterface
 
         $this->dispatcher->dispatch(KernelEvents::RESPONSE, $event);
 
+        $this->finishRequest($request, $type);
+
         return $event->getResponse();
     }
 
     /**
-     * Handles and exception by trying to convert it to a Response.
+     * Publishes the finish request event, then pop the request from the stack.
      *
-     * @param  \Exception $e       An \Exception instance
-     * @param  Request    $request A Request instance
-     * @param  integer    $type    The type of the request
+     * Note that the order of the operations is important here, otherwise
+     * operations such as {@link RequestStack::getParentRequest()} can lead to
+     * weird results.
+     *
+     * @param Request $request
+     * @param int     $type
+     */
+    private function finishRequest(Request $request, $type)
+    {
+        $this->dispatcher->dispatch(KernelEvents::FINISH_REQUEST, new FinishRequestEvent($this, $request, $type));
+        $this->requestStack->pop();
+    }
+
+    /**
+     * Handles an exception by trying to convert it to a Response.
+     *
+     * @param \Exception $e       An \Exception instance
+     * @param Request    $request A Request instance
+     * @param integer    $type    The type of the request
      *
      * @return Response A Response instance
+     *
+     * @throws \Exception
      */
     private function handleException(\Exception $e, $request, $type)
     {
         $event = new GetResponseForExceptionEvent($this, $request, $type, $e);
         $this->dispatcher->dispatch(KernelEvents::EXCEPTION, $event);
 
+        // a listener might have replaced the exception
+        $e = $event->getException();
+
         if (!$event->hasResponse()) {
+            $this->finishRequest($request, $type);
+
             throw $e;
         }
 
+        $response = $event->getResponse();
+
+        // the developer asked for a specific status code
+        if ($response->headers->has('X-Status-Code')) {
+            $response->setStatusCode($response->headers->get('X-Status-Code'));
+
+            $response->headers->remove('X-Status-Code');
+        } elseif (!$response->isClientError() && !$response->isServerError() && !$response->isRedirect()) {
+            // ensure that we actually have an error response
+            if ($e instanceof HttpExceptionInterface) {
+                // keep the HTTP status code and headers
+                $response->setStatusCode($e->getStatusCode());
+                $response->headers->add($e->getHeaders());
+            } else {
+                $response->setStatusCode(500);
+            }
+        }
+
         try {
-            return $this->filterResponse($event->getResponse(), $request, $type);
+            return $this->filterResponse($response, $request, $type);
         } catch (\Exception $e) {
-            return $event->getResponse();
+            return $response;
         }
     }
 

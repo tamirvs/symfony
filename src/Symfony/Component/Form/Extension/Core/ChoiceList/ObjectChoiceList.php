@@ -11,16 +11,18 @@
 
 namespace Symfony\Component\Form\Extension\Core\ChoiceList;
 
-use Symfony\Component\Form\Util\PropertyPath;
 use Symfony\Component\Form\Exception\StringCastException;
-use Symfony\Component\Form\Exception\UnexpectedTypeException;
-use Symfony\Component\Form\Exception\InvalidPropertyException;
+use Symfony\Component\Form\Exception\InvalidArgumentException;
+use Symfony\Component\PropertyAccess\PropertyPath;
+use Symfony\Component\PropertyAccess\Exception\NoSuchPropertyException;
+use Symfony\Component\PropertyAccess\PropertyAccess;
+use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 
 /**
  * A choice list for object choices.
  *
- * Supports generation of choice labels, choice groups, choice values and
- * choice indices by calling getters of the object (or associated objects).
+ * Supports generation of choice labels, choice groups and choice values
+ * by calling getters of the object (or associated objects).
  *
  * <code>
  * $choices = array($user1, $user2);
@@ -33,6 +35,11 @@ use Symfony\Component\Form\Exception\InvalidPropertyException;
  */
 class ObjectChoiceList extends ChoiceList
 {
+    /**
+     * @var PropertyAccessorInterface
+     */
+    private $propertyAccessor;
+
     /**
      * The property path used to obtain the choice label.
      *
@@ -55,45 +62,37 @@ class ObjectChoiceList extends ChoiceList
     private $valuePath;
 
     /**
-     * The property path used to obtain the choice index.
-     *
-     * @var PropertyPath
-     */
-    private $indexPath;
-
-    /**
      * Creates a new object choice list.
      *
-     * @param array $choices The array of choices. Choices may also be given
-     *                       as hierarchy of unlimited depth. Hierarchies are
-     *                       created by creating nested arrays. The title of
-     *                       the sub-hierarchy can be stored in the array
-     *                       key pointing to the nested array.
-     * @param string $labelPath A property path pointing to the property used
-     *                          for the choice labels. The value is obtained
-     *                          by calling the getter on the object. If the
-     *                          path is NULL, the object's __toString() method
-     *                          is used instead.
-     * @param array $preferredChoices A flat array of choices that should be
-     *                                presented to the user with priority.
-     * @param string $groupPath A property path pointing to the property used
-     *                          to group the choices. Only allowed if
-     *                          the choices are given as flat array.
-     * @param string $valuePath A property path pointing to the property used
-     *                          for the choice values. If not given, integers
-     *                          are generated instead.
-     * @param string $indexPath A property path pointing to the property used
-     *                          for the choice indices. If not given, integers
-     *                          are generated instead.
+     * @param array|\Traversable       $choices           The array of choices. Choices may also be given
+     *                                                    as hierarchy of unlimited depth by creating nested
+     *                                                    arrays. The title of the sub-hierarchy can be
+     *                                                    stored in the array key pointing to the nested
+     *                                                    array. The topmost level of the hierarchy may also
+     *                                                    be a \Traversable.
+     * @param string                   $labelPath         A property path pointing to the property used
+     *                                                    for the choice labels. The value is obtained
+             *                                            by calling the getter on the object. If the
+     *                                                    path is NULL, the object's __toString() method
+     *                                                    is used instead.
+     * @param array                    $preferredChoices  A flat array of choices that should be
+     *                                                    presented to the user with priority.
+     * @param string                   $groupPath         A property path pointing to the property used
+     *                                                    to group the choices. Only allowed if
+     *                                                    the choices are given as flat array.
+     * @param string                   $valuePath         A property path pointing to the property used
+     *                                                    for the choice values. If not given, integers
+     *                                                    are generated instead.
+     * @param PropertyAccessorInterface $propertyAccessor The reflection graph for reading property paths.
      */
-    public function __construct($choices, $labelPath = null, array $preferredChoices = array(), $groupPath = null, $valuePath = null, $indexPath = null)
+    public function __construct($choices, $labelPath = null, array $preferredChoices = array(), $groupPath = null, $valuePath = null, PropertyAccessorInterface $propertyAccessor = null)
     {
-        $this->labelPath = $labelPath ? new PropertyPath($labelPath) : null;
-        $this->groupPath = $groupPath ? new PropertyPath($groupPath) : null;
-        $this->valuePath = $valuePath ? new PropertyPath($valuePath) : null;
-        $this->indexPath = $indexPath ? new PropertyPath($indexPath) : null;
+        $this->propertyAccessor = $propertyAccessor ?: PropertyAccess::createPropertyAccessor();
+        $this->labelPath = null !== $labelPath ? new PropertyPath($labelPath) : null;
+        $this->groupPath = null !== $groupPath ? new PropertyPath($groupPath) : null;
+        $this->valuePath = null !== $valuePath ? new PropertyPath($valuePath) : null;
 
-        parent::__construct($choices, array(), $preferredChoices, self::GENERATE, self::GENERATE);
+        parent::__construct($choices, array(), $preferredChoices);
     }
 
     /**
@@ -101,27 +100,26 @@ class ObjectChoiceList extends ChoiceList
      *
      * Safe to be called multiple times. The list is cleared on every call.
      *
-     * @param array|\Traversable $choices The choices to write into the list.
-     * @param array $labels Ignored.
-     * @param array $preferredChoices The choices to display with priority.
+     * @param array|\Traversable $choices          The choices to write into the list.
+     * @param array              $labels           Ignored.
+     * @param array              $preferredChoices The choices to display with priority.
+     *
+     * @throws InvalidArgumentException When passing a hierarchy of choices and using
+     *                                   the "groupPath" option at the same time.
      */
     protected function initialize($choices, array $labels, array $preferredChoices)
     {
-        if (!is_array($choices) && !$choices instanceof \Traversable) {
-            throw new UnexpectedTypeException($choices, 'array or \Traversable');
-        }
-
         if (null !== $this->groupPath) {
             $groupedChoices = array();
 
             foreach ($choices as $i => $choice) {
                 if (is_array($choice)) {
-                    throw new \InvalidArgumentException('You should pass a plain object array (without groups, $code, $previous) when using the "groupPath" option');
+                    throw new InvalidArgumentException('You should pass a plain object array (without groups) when using the "groupPath" option.');
                 }
 
                 try {
-                    $group = $this->groupPath->getValue($choice);
-                } catch (InvalidPropertyException $e) {
+                    $group = $this->propertyAccessor->getValue($choice, $this->groupPath);
+                } catch (NoSuchPropertyException $e) {
                     // Don't group items whose group property does not exist
                     // see https://github.com/symfony/symfony/commit/d9b7abb7c7a0f28e0ce970afc5e305dce5dccddf
                     $group = null;
@@ -149,41 +147,20 @@ class ObjectChoiceList extends ChoiceList
     }
 
     /**
-     * Creates a new unique index for this choice.
-     *
-     * If a property path for the index was given at object creation,
-     * the getter behind that path is now called to obtain a new value.
-     *
-     * Otherwise a new integer is generated.
-     *
-     * @param mixed $choice The choice to create an index for
-     * @return integer|string A unique index containing only ASCII letters,
-     *                        digits and underscores.
-     */
-    protected function createIndex($choice)
-    {
-        if ($this->indexPath) {
-            return $this->indexPath->getValue($choice);
-        }
-
-        return parent::createIndex($choice);
-    }
-
-    /**
      * Creates a new unique value for this choice.
      *
      * If a property path for the value was given at object creation,
      * the getter behind that path is now called to obtain a new value.
-     *
      * Otherwise a new integer is generated.
      *
      * @param mixed $choice The choice to create a value for
+     *
      * @return integer|string A unique value without character limitations.
      */
     protected function createValue($choice)
     {
         if ($this->valuePath) {
-            return $this->valuePath->getValue($choice);
+            return (string) $this->propertyAccessor->getValue($choice, $this->valuePath);
         }
 
         return parent::createValue($choice);
@@ -192,15 +169,15 @@ class ObjectChoiceList extends ChoiceList
     private function extractLabels($choices, array &$labels)
     {
         foreach ($choices as $i => $choice) {
-            if (is_array($choice) || $choice instanceof \Traversable) {
+            if (is_array($choice)) {
                 $labels[$i] = array();
                 $this->extractLabels($choice, $labels[$i]);
             } elseif ($this->labelPath) {
-                $labels[$i] = $this->labelPath->getValue($choice);
+                $labels[$i] = $this->propertyAccessor->getValue($choice, $this->labelPath);
             } elseif (method_exists($choice, '__toString')) {
                 $labels[$i] = (string) $choice;
             } else {
-                throw new StringCastException('A "__toString()" method was not found on the objects of type "' . get_class($choice) . '" passed to the choice field. To read a custom getter instead, set the argument $labelPath to the desired property path.');
+                throw new StringCastException(sprintf('A "__toString()" method was not found on the objects of type "%s" passed to the choice field. To read a custom getter instead, set the argument $labelPath to the desired property path.', get_class($choice)));
             }
         }
     }

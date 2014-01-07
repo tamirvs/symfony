@@ -11,7 +11,6 @@
 
 namespace Symfony\Component\HttpKernel\Profiler;
 
-
 /**
  * SqliteProfilerStorage stores profiling information in a SQLite database.
  *
@@ -26,7 +25,7 @@ class SqliteProfilerStorage extends PdoProfilerStorage
     {
         if (null === $this->db || $this->db instanceof \SQLite3) {
             if (0 !== strpos($this->dsn, 'sqlite')) {
-                throw new \RuntimeException('You are trying to use Sqlite with a wrong dsn. "'.$this->dsn.'"');
+                throw new \RuntimeException(sprintf('Please check your configuration. You are trying to use Sqlite with an invalid dsn "%s". The expected format is "sqlite:/path/to/the/db/file".', $this->dsn));
             }
             if (class_exists('SQLite3')) {
                 $db = new \SQLite3(substr($this->dsn, 7, strlen($this->dsn)), \SQLITE3_OPEN_READWRITE | \SQLITE3_OPEN_CREATE);
@@ -98,7 +97,7 @@ class SqliteProfilerStorage extends PdoProfilerStorage
     /**
      * {@inheritdoc}
      */
-    protected function buildCriteria($ip, $url, $limit, $method)
+    protected function buildCriteria($ip, $url, $start, $end, $limit, $method)
     {
         $criteria = array();
         $args = array();
@@ -116,6 +115,16 @@ class SqliteProfilerStorage extends PdoProfilerStorage
         if ($method) {
             $criteria[] = 'method = :method';
             $args[':method'] = $method;
+        }
+
+        if (!empty($start)) {
+            $criteria[] = 'time >= :start';
+            $args[':start'] = $start;
+        }
+
+        if (!empty($end)) {
+            $criteria[] = 'time <= :end';
+            $args[':end'] = $end;
         }
 
         return array($criteria, $args);

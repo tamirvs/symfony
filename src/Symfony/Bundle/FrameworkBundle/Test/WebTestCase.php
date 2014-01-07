@@ -13,7 +13,7 @@ namespace Symfony\Bundle\FrameworkBundle\Test;
 
 use Symfony\Bundle\FrameworkBundle\Client;
 use Symfony\Component\Finder\Finder;
-use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelInterface;
 
 /**
  * WebTestCase is the base class for functional tests.
@@ -22,19 +22,27 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
  */
 abstract class WebTestCase extends \PHPUnit_Framework_TestCase
 {
-    static protected $class;
-    static protected $kernel;
+    protected static $class;
+
+    /**
+     * @var KernelInterface
+     */
+    protected static $kernel;
 
     /**
      * Creates a Client.
      *
-     * @param array   $options An array of options to pass to the createKernel class
-     * @param array   $server  An array of server parameters
+     * @param array $options An array of options to pass to the createKernel class
+     * @param array $server  An array of server parameters
      *
      * @return Client A Client instance
      */
-    static protected function createClient(array $options = array(), array $server = array())
+    protected static function createClient(array $options = array(), array $server = array())
     {
+        if (null !== static::$kernel) {
+            static::$kernel->shutdown();
+        }
+
         static::$kernel = static::createKernel($options);
         static::$kernel->boot();
 
@@ -51,8 +59,10 @@ abstract class WebTestCase extends \PHPUnit_Framework_TestCase
      * If not, override this method in your test classes.
      *
      * @return string The directory where phpunit.xml(.dist) is stored
+     *
+     * @throws \RuntimeException
      */
-    static protected function getPhpUnitXmlDir()
+    protected static function getPhpUnitXmlDir()
     {
         if (!isset($_SERVER['argv']) || false === strpos($_SERVER['argv'][0], 'phpunit')) {
             throw new \RuntimeException('You must override the WebTestCase::createKernel() method.');
@@ -78,19 +88,19 @@ abstract class WebTestCase extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * Finds the value of configuration flag from cli
+     * Finds the value of the CLI configuration option.
      *
      * PHPUnit will use the last configuration argument on the command line, so this only returns
-     * the last configuration argument
+     * the last configuration argument.
      *
-     * @return string The value of the phpunit cli configuration option
+     * @return string The value of the PHPUnit CLI configuration option
      */
-    static private function getPhpUnitCliConfigArgument()
+    private static function getPhpUnitCliConfigArgument()
     {
         $dir = null;
         $reversedArgs = array_reverse($_SERVER['argv']);
         foreach ($reversedArgs as $argIndex => $testArg) {
-            if ($testArg === '-c' || $testArg === '--configuration') {
+            if (preg_match('/^-[^ \-]*c$/', $testArg) || $testArg === '--configuration') {
                 $dir = realpath($reversedArgs[$argIndex - 1]);
                 break;
             } elseif (strpos($testArg, '--configuration=') === 0) {
@@ -109,10 +119,20 @@ abstract class WebTestCase extends \PHPUnit_Framework_TestCase
      * When the Kernel is located, the file is required.
      *
      * @return string The Kernel class name
+     *
+     * @throws \RuntimeException
      */
-    static protected function getKernelClass()
+    protected static function getKernelClass()
     {
-        $dir = isset($_SERVER['KERNEL_DIR']) ? $_SERVER['KERNEL_DIR'] : static::getPhpUnitXmlDir();
+        $dir = $phpUnitDir = static::getPhpUnitXmlDir();
+
+        if (isset($_SERVER['KERNEL_DIR'])) {
+            $dir = $_SERVER['KERNEL_DIR'];
+
+            if (!is_dir($dir) && is_dir("$phpUnitDir/$dir")) {
+                $dir = "$phpUnitDir/$dir";
+            }
+        }
 
         $finder = new Finder();
         $finder->name('*Kernel.php')->depth(0)->in($dir);
@@ -139,9 +159,9 @@ abstract class WebTestCase extends \PHPUnit_Framework_TestCase
      *
      * @param array $options An array of options
      *
-     * @return HttpKernelInterface A HttpKernelInterface instance
+     * @return KernelInterface A KernelInterface instance
      */
-    static protected function createKernel(array $options = array())
+    protected static function createKernel(array $options = array())
     {
         if (null === static::$class) {
             static::$class = static::getKernelClass();

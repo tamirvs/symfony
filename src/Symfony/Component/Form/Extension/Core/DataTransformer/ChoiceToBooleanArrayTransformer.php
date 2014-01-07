@@ -14,7 +14,6 @@ namespace Symfony\Component\Form\Extension\Core\DataTransformer;
 use Symfony\Component\Form\Extension\Core\ChoiceList\ChoiceListInterface;
 use Symfony\Component\Form\DataTransformerInterface;
 use Symfony\Component\Form\Exception\TransformationFailedException;
-use Symfony\Component\Form\Exception\UnexpectedTypeException;
 
 /**
  * @author Bernhard Schussek <bschussek@gmail.com>
@@ -23,14 +22,18 @@ class ChoiceToBooleanArrayTransformer implements DataTransformerInterface
 {
     private $choiceList;
 
+    private $placeholderPresent;
+
     /**
      * Constructor.
      *
      * @param ChoiceListInterface $choiceList
+     * @param Boolean             $placeholderPresent
      */
-    public function __construct(ChoiceListInterface $choiceList)
+    public function __construct(ChoiceListInterface $choiceList, $placeholderPresent)
     {
         $this->choiceList = $choiceList;
+        $this->placeholderPresent = $placeholderPresent;
     }
 
     /**
@@ -41,13 +44,13 @@ class ChoiceToBooleanArrayTransformer implements DataTransformerInterface
      * depending on whether a given option is selected. If this field is rendered
      * as select tag, the value is not modified.
      *
-     * @param  mixed $choice An array if "multiple" is set to true, a scalar
-     *                       value otherwise.
+     * @param mixed $choice An array if "multiple" is set to true, a scalar
+     *                      value otherwise.
      *
      * @return mixed An array
      *
-     * @throws UnexpectedTypeException if the given value is not scalar
-     * @throws TransformationFailedException if the choices can not be retrieved
+     * @throws TransformationFailedException If the given value is not scalar or
+     *                                       if the choices can not be retrieved.
      */
     public function transform($choice)
     {
@@ -57,10 +60,14 @@ class ChoiceToBooleanArrayTransformer implements DataTransformerInterface
             throw new TransformationFailedException('Can not get the choice list', $e->getCode(), $e);
         }
 
-        $index = current($this->choiceList->getIndicesForChoices(array($choice)));
+        $valueMap = array_flip($this->choiceList->getValuesForChoices(array($choice)));
 
         foreach ($values as $i => $value) {
-            $values[$i] = $i === $index;
+            $values[$i] = isset($valueMap[$value]);
+        }
+
+        if ($this->placeholderPresent) {
+            $values['placeholder'] = 0 === count($valueMap);
         }
 
         return $values;
@@ -73,16 +80,19 @@ class ChoiceToBooleanArrayTransformer implements DataTransformerInterface
      * values, depending on whether a given choice is selected. The output
      * is the selected choice.
      *
-     * @param  array $values An array of values
+     * @param array $values An array of values
      *
      * @return mixed A scalar value
      *
-     * @throws new UnexpectedTypeException if the given value is not an array
+     * @throws TransformationFailedException If the given value is not an array,
+     *                                       if the recuperation of the choices
+     *                                       fails or if some choice can't be
+     *                                       found.
      */
     public function reverseTransform($values)
     {
         if (!is_array($values)) {
-            throw new UnexpectedTypeException($values, 'array');
+            throw new TransformationFailedException('Expected an array.');
         }
 
         try {
@@ -95,8 +105,10 @@ class ChoiceToBooleanArrayTransformer implements DataTransformerInterface
             if ($selected) {
                 if (isset($choices[$i])) {
                     return $choices[$i] === '' ? null : $choices[$i];
+                } elseif ($this->placeholderPresent && 'placeholder' === $i) {
+                    return null;
                 } else {
-                    throw new TransformationFailedException('The choice "' . $i . '" does not exist');
+                    throw new TransformationFailedException(sprintf('The choice "%s" does not exist', $i));
                 }
             }
         }

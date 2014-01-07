@@ -4,7 +4,6 @@
     "description": "Symfony EventDispatcher Component",
     "keywords": [],
     "homepage": "http://symfony.com",
-    "version": "2.1.0",
     "license": "MIT",
     "authors": [
         {
@@ -17,10 +16,25 @@
         }
     ],
     "require": {
-        "php": ">=5.3.2"
+        "php": ">=5.3.3"
+    },
+    "require-dev": {
+        "symfony/dependency-injection": "~2.0",
+        "symfony/stopwatch": "~2.2",
+        "psr/log": "~1.0"
+    },
+    "suggest": {
+        "symfony/dependency-injection": "",
+        "symfony/http-kernel": ""
     },
     "autoload": {
-        "psr-0": { "Symfony\\Component\\EventDispatcher": "" }
+        "psr-0": { "Symfony\\Component\\EventDispatcher\\": "" }
     },
-    "target-dir": "Symfony/Component/EventDispatcher"
+    "target-dir": "Symfony/Component/EventDispatcher",
+    "minimum-stability": "dev",
+    "extra": {
+        "branch-alias": {
+            "dev-master": "2.5-dev"
+        }
+    }
 }

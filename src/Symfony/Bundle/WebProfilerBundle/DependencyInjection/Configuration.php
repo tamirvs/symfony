@@ -36,7 +36,6 @@ class Configuration implements ConfigurationInterface
 
         $rootNode
             ->children()
-                ->booleanNode('verbose')->defaultTrue()->end()
                 ->booleanNode('toolbar')->defaultFalse()->end()
                 ->scalarNode('position')
                     ->defaultValue('bottom')

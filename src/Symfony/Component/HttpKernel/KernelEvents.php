@@ -14,7 +14,7 @@ namespace Symfony\Component\HttpKernel;
 /**
  * Contains all events thrown in the HttpKernel component
  *
- * @author Bernhard Schussek <bernhard.schussek@symfony.com>
+ * @author Bernhard Schussek <bschussek@gmail.com>
  *
  * @api
  */
@@ -93,7 +93,7 @@ final class KernelEvents
     const RESPONSE = 'kernel.response';
 
     /**
-     * The TERMINATE event occurs once a reponse was sent
+     * The TERMINATE event occurs once a response was sent
      *
      * This event allows you to run expensive post-response jobs.
      * The event listener method receives a
@@ -102,4 +102,14 @@ final class KernelEvents
      * @var string
      */
     const TERMINATE = 'kernel.terminate';
+
+    /**
+     * The REQUEST_FINISHED event occurs when a response was generated for a request.
+     *
+     * This event allows you to reset the global and environmental state of
+     * the application, when it was changed during the request.
+     *
+     * @var string
+     */
+    const FINISH_REQUEST = 'kernel.finish_request';
 }

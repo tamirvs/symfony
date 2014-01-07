@@ -40,7 +40,7 @@ class DoctrineDataCollector extends DataCollector
     /**
      * Adds the stack logger for a connection.
      *
-     * @param string $name
+     * @param string     $name
      * @param DebugStack $logger
      */
     public function addLogger($name, DebugStack $logger)
@@ -148,6 +148,7 @@ class DoctrineDataCollector extends DataCollector
      * value to explain the query).
      *
      * @param mixed $var
+     *
      * @return array
      */
     private function sanitizeParam($var)

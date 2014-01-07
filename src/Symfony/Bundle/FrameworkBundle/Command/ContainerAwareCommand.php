@@ -11,7 +11,6 @@
 
 namespace Symfony\Bundle\FrameworkBundle\Command;
 
-use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\ContainerAwareInterface;
@@ -24,7 +23,7 @@ use Symfony\Component\DependencyInjection\ContainerAwareInterface;
 abstract class ContainerAwareCommand extends Command implements ContainerAwareInterface
 {
     /**
-     * @var ContainerInterface
+     * @var ContainerInterface|null
      */
     private $container;
 
@@ -41,7 +40,7 @@ abstract class ContainerAwareCommand extends Command implements ContainerAwareIn
     }
 
     /**
-     * @see ContainerAwareInterface::setContainer()
+     * {@inheritdoc}
      */
     public function setContainer(ContainerInterface $container = null)
     {

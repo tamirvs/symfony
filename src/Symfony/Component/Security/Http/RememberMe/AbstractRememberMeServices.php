@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the Symfony package.
+ *
+ * (c) Fabien Potencier <fabien@symfony.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace Symfony\Component\Security\Http\RememberMe;
 
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
@@ -13,16 +22,7 @@ use Symfony\Component\Security\Core\Exception\CookieTheftException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Cookie;
-use Symfony\Component\HttpKernel\Log\LoggerInterface;
-
-/*
- * This file is part of the Symfony package.
- *
- * (c) Fabien Potencier <fabien@symfony.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
+use Psr\Log\LoggerInterface;
 
 /**
  * Base class implementing the RememberMeServicesInterface
@@ -40,13 +40,15 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
     private $userProviders;
 
     /**
-     * Constructor
+     * Constructor.
      *
      * @param array           $userProviders
      * @param string          $key
      * @param string          $providerKey
      * @param array           $options
      * @param LoggerInterface $logger
+     *
+     * @throws \InvalidArgumentException
      */
     public function __construct(array $userProviders, $key, $providerKey, array $options = array(), LoggerInterface $logger = null)
     {
@@ -78,6 +80,9 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
         return $this->options['remember_me_parameter'];
     }
 
+    /**
+     * @return string
+     */
     public function getKey()
     {
         return $this->key;
@@ -89,9 +94,12 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
      *
      * @param Request $request
      *
-     * @return TokenInterface
+     * @return TokenInterface|null
+     *
+     * @throws CookieTheftException
+     * @throws \RuntimeException
      */
-    public final function autoLogin(Request $request)
+    final public function autoLogin(Request $request)
     {
         if (null === $cookie = $request->cookies->get($this->options['name'])) {
             return;
@@ -125,7 +133,7 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
             }
         } catch (UnsupportedUserException $unSupported) {
             if (null !== $this->logger) {
-                $this->logger->warn('User class for remember-me cookie not supported.');
+                $this->logger->warning('User class for remember-me cookie not supported.');
             }
         } catch (AuthenticationException $invalid) {
             if (null !== $this->logger) {
@@ -156,7 +164,7 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
      *
      * @param Request $request
      */
-    public final function loginFail(Request $request)
+    final public function loginFail(Request $request)
     {
         $this->cancelCookie($request);
         $this->onLoginFail($request);
@@ -170,8 +178,11 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
      * @param Response       $response
      * @param TokenInterface $token    The token that resulted in a successful authentication
      */
-    public final function loginSuccess(Request $request, Response $response, TokenInterface $token)
+    final public function loginSuccess(Request $request, Response $response, TokenInterface $token)
     {
+        // Make sure any old remember-me cookies are cancelled
+        $this->cancelCookie($request);
+
         if (!$token->getUser() instanceof UserInterface) {
             if (null !== $this->logger) {
                 $this->logger->debug('Remember-me ignores token since it does not contain a UserInterface implementation.');
@@ -192,6 +203,12 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
             $this->logger->debug('Remember-me was requested; setting cookie.');
         }
 
+        // Remove attribute from request that sets a NULL cookie.
+        // It was set by $this->cancelCookie()
+        // (cancelCookie does other things too for some RememberMeServices
+        // so we should still call it at the start of this method)
+        $request->attributes->remove(self::COOKIE_ATTR_NAME);
+
         $this->onLoginSuccess($request, $response, $token);
     }
 
@@ -206,6 +223,9 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
      */
     abstract protected function processAutoLoginCookie(array $cookieParts, Request $request);
 
+    /**
+     * @param Request $request
+     */
     protected function onLoginFail(Request $request)
     {
     }
@@ -221,7 +241,7 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
      */
     abstract protected function onLoginSuccess(Request $request, Response $response, TokenInterface $token);
 
-    protected final function getUserProvider($class)
+    final protected function getUserProvider($class)
     {
         foreach ($this->userProviders as $provider) {
             if ($provider->supportsClass($class)) {
@@ -271,7 +291,7 @@ abstract class AbstractRememberMeServices implements RememberMeServicesInterface
     }
 
     /**
-     * Checks whether remember-me capabilities where requested
+     * Checks whether remember-me capabilities were requested
      *
      * @param Request $request
      *

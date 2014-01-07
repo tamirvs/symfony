@@ -22,9 +22,22 @@ namespace Symfony\Component\DomCrawler\Field;
  */
 class ChoiceFormField extends FormField
 {
+    /**
+     * @var string
+     */
     private $type;
+    /**
+     * @var Boolean
+     */
     private $multiple;
+    /**
+     * @var array
+     */
     private $options;
+    /**
+     * @var boolean
+     */
+    private $validationDisabled = false;
 
     /**
      * Returns true if the field should be included in the submitted values.
@@ -44,7 +57,7 @@ class ChoiceFormField extends FormField
     /**
      * Check if the current selected option is disabled
      *
-     * @return bool
+     * @return Boolean
      */
     public function isDisabled()
     {
@@ -62,8 +75,6 @@ class ChoiceFormField extends FormField
      *
      * @param string $value The value of the field
      *
-     * @throws \InvalidArgumentException When value type provided is not correct
-     *
      * @api
      */
     public function select($value)
@@ -74,7 +85,7 @@ class ChoiceFormField extends FormField
     /**
      * Ticks a checkbox.
      *
-     * @throws \InvalidArgumentException When value type provided is not correct
+     * @throws \LogicException When the type provided is not correct
      *
      * @api
      */
@@ -90,7 +101,7 @@ class ChoiceFormField extends FormField
     /**
      * Ticks a checkbox.
      *
-     * @throws \InvalidArgumentException When value type provided is not correct
+     * @throws \LogicException When the type provided is not correct
      *
      * @api
      */
@@ -248,7 +259,7 @@ class ChoiceFormField extends FormField
     /**
      * Returns option value with associated disabled flag
      *
-     * @param type $node
+     * @param \DOMNode $node
      *
      * @return array
      */
@@ -273,6 +284,10 @@ class ChoiceFormField extends FormField
      */
     public function containsOption($optionValue, $options)
     {
+        if ($this->validationDisabled) {
+            return true;
+        }
+
         foreach ($options as $option) {
             if ($option['value'] == $optionValue) {
                 return true;
@@ -296,5 +311,17 @@ class ChoiceFormField extends FormField
         }
 
         return $values;
+    }
+
+    /**
+     * Disables the internal validation of the field.
+     *
+     * @return self
+     */
+    public function disableValidation()
+    {
+        $this->validationDisabled = true;
+
+        return $this;
     }
 }

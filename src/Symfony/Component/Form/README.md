@@ -1,7 +1,7 @@
 Form Component
 ==============
 
-Form provides tools for defining forms, rendering and binding request data to
+Form provides tools for defining forms, rendering and mapping request data to
 related models. Furthermore it provides integration with the Validation
 component.
 
@@ -12,10 +12,15 @@ Silex integration:
 
 https://github.com/fabpot/Silex/blob/master/src/Silex/Provider/FormServiceProvider.php
 
-Unit tests:
-
-https://github.com/symfony/symfony/tree/master/tests/Symfony/Tests/Component/Form
-
 Documentation:
 
-http://symfony.com/doc/2.0/book/forms.html
+http://symfony.com/doc/2.5/book/forms.html
+
+Resources
+---------
+
+You can run the unit tests with the following command:
+
+    $ cd path/to/Symfony/Component/Form/
+    $ composer.phar install
+    $ phpunit

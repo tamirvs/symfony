@@ -20,7 +20,6 @@ use Memcache;
  */
 class MemcacheProfilerStorage extends BaseMemcacheProfilerStorage
 {
-
     /**
      * @var Memcache
      */
@@ -30,24 +29,36 @@ class MemcacheProfilerStorage extends BaseMemcacheProfilerStorage
      * Internal convenience method that returns the instance of the Memcache
      *
      * @return Memcache
+     *
+     * @throws \RuntimeException
      */
     protected function getMemcache()
     {
         if (null === $this->memcache) {
-            if (!preg_match('#^memcache://(.*)/(.*)$#', $this->dsn, $matches)) {
-                throw new \RuntimeException('Please check your configuration. You are trying to use Memcache with an invalid dsn. "' . $this->dsn . '"');
+            if (!preg_match('#^memcache://(?(?=\[.*\])\[(.*)\]|(.*)):(.*)$#', $this->dsn, $matches)) {
+                throw new \RuntimeException(sprintf('Please check your configuration. You are trying to use Memcache with an invalid dsn "%s". The expected format is "memcache://[host]:port".', $this->dsn));
             }
 
-            $host = $matches[1];
-            $port = $matches[2];
+            $host = $matches[1] ?: $matches[2];
+            $port = $matches[3];
 
-            $memcache = new Memcache;
+            $memcache = new Memcache();
             $memcache->addServer($host, $port);
 
             $this->memcache = $memcache;
         }
 
         return $this->memcache;
+    }
+
+    /**
+     * Set instance of the Memcache
+     *
+     * @param Memcache $memcache
+     */
+    public function setMemcache($memcache)
+    {
+        $this->memcache = $memcache;
     }
 
     /**
@@ -69,9 +80,9 @@ class MemcacheProfilerStorage extends BaseMemcacheProfilerStorage
     /**
      * {@inheritdoc}
      */
-    protected function flush()
+    protected function delete($key)
     {
-        return $this->getMemcache()->flush();
+        return $this->getMemcache()->delete($key);
     }
 
     /**
@@ -94,7 +105,6 @@ class MemcacheProfilerStorage extends BaseMemcacheProfilerStorage
         //simulate append in Memcache <3.0
         $content = $memcache->get($key);
 
-        return $memcache->set($key, $content . $value, false, $expiration);
+        return $memcache->set($key, $content.$value, false, $expiration);
     }
-
 }

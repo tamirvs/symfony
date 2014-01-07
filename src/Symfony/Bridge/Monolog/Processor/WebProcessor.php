@@ -12,7 +12,7 @@
 namespace Symfony\Bridge\Monolog\Processor;
 
 use Monolog\Processor\WebProcessor as BaseWebProcessor;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 
 /**
  * WebProcessor override to read from the HttpFoundation's Request
@@ -21,8 +21,16 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class WebProcessor extends BaseWebProcessor
 {
-    public function __construct(Request $request)
+    public function __construct()
     {
-        parent::__construct($request->server->all());
+        // Pass an empty array as the default null value would access $_SERVER
+        parent::__construct(array());
+    }
+
+    public function onKernelRequest(GetResponseEvent $event)
+    {
+        if ($event->isMasterRequest()) {
+            $this->serverData = $event->getRequest()->server->all();
+        }
     }
 }

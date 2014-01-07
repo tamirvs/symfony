@@ -1,7 +1,5 @@
 <?php
 
-namespace Symfony\Bundle\FrameworkBundle\DependencyInjection\Compiler;
-
 /*
  * This file is part of the Symfony package.
  *
@@ -11,6 +9,8 @@ namespace Symfony\Bundle\FrameworkBundle\DependencyInjection\Compiler;
  * file that was distributed with this source code.
  */
 
+namespace Symfony\Bundle\FrameworkBundle\DependencyInjection\Compiler;
+
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 
@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
  * Adds all services with the tags "form.type" and "form.type_guesser" as
  * arguments of the "form.extension" service
  *
- * @author Bernhard Schussek <bernhard.schussek@symfony-project.com>
+ * @author Bernhard Schussek <bschussek@gmail.com>
  */
 class FormPass implements CompilerPassInterface
 {
@@ -27,6 +27,8 @@ class FormPass implements CompilerPassInterface
         if (!$container->hasDefinition('form.extension')) {
             return;
         }
+
+        $definition = $container->getDefinition('form.extension');
 
         // Builds an array with service IDs as keys and tag aliases as values
         $types = array();
@@ -40,7 +42,7 @@ class FormPass implements CompilerPassInterface
             $types[$alias] = $serviceId;
         }
 
-        $container->getDefinition('form.extension')->replaceArgument(1, $types);
+        $definition->replaceArgument(1, $types);
 
         $typeExtensions = array();
 
@@ -52,11 +54,11 @@ class FormPass implements CompilerPassInterface
             $typeExtensions[$alias][] = $serviceId;
         }
 
-        $container->getDefinition('form.extension')->replaceArgument(2, $typeExtensions);
+        $definition->replaceArgument(2, $typeExtensions);
 
         // Find all services annotated with "form.type_guesser"
         $guessers = array_keys($container->findTaggedServiceIds('form.type_guesser'));
 
-        $container->getDefinition('form.extension')->replaceArgument(3, $guessers);
+        $definition->replaceArgument(3, $guessers);
     }
 }

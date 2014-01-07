@@ -16,24 +16,19 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
 /**
+ * @author Bernhard Schussek <bschussek@gmail.com>
+ *
  * @api
  */
 class EmailValidator extends ConstraintValidator
 {
     /**
-     * Checks if the passed value is valid.
-     *
-     * @param mixed      $value      The value that should be validated
-     * @param Constraint $constraint The constraint for the validation
-     *
-     * @return Boolean Whether or not the value is valid
-     *
-     * @api
+     * {@inheritDoc}
      */
-    public function isValid($value, Constraint $constraint)
+    public function validate($value, Constraint $constraint)
     {
         if (null === $value || '' === $value) {
-            return true;
+            return;
         }
 
         if (!is_scalar($value) && !(is_object($value) && method_exists($value, '__toString'))) {
@@ -46,35 +41,40 @@ class EmailValidator extends ConstraintValidator
         if ($valid) {
             $host = substr($value, strpos($value, '@') + 1);
 
-            if (version_compare(PHP_VERSION, '5.3.3', '<') && strpos($host, '.') === false) {
-                // Likely not a FQDN, bug in PHP FILTER_VALIDATE_EMAIL prior to PHP 5.3.3
-                $valid = false;
-            }
-
-            // Check MX records
+            // Check for host DNS resource records
             if ($valid && $constraint->checkMX) {
                 $valid = $this->checkMX($host);
+            } elseif ($valid && $constraint->checkHost) {
+                $valid = $this->checkHost($host);
             }
         }
 
         if (!$valid) {
             $this->context->addViolation($constraint->message, array('{{ value }}' => $value));
-
-            return false;
         }
-
-        return true;
     }
 
     /**
      * Check DNS Records for MX type.
      *
-     * @param string $host Host name
+     * @param string $host Host
      *
      * @return Boolean
      */
     private function checkMX($host)
     {
         return checkdnsrr($host, 'MX');
+    }
+
+    /**
+     * Check if one of MX, A or AAAA DNS RR exists.
+     *
+     * @param string $host Host
+     *
+     * @return Boolean
+     */
+    private function checkHost($host)
+    {
+        return $this->checkMX($host) || (checkdnsrr($host, "A") || checkdnsrr($host, "AAAA"));
     }
 }

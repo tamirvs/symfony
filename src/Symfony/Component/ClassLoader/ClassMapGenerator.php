@@ -22,9 +22,9 @@ class ClassMapGenerator
      * Generate a class map file
      *
      * @param array|string $dirs Directories or a single path to search in
-     * @param string $file The name of the class map file
+     * @param string       $file The name of the class map file
      */
-    static public function dump($dirs, $file)
+    public static function dump($dirs, $file)
     {
         $dirs = (array) $dirs;
         $maps = array();
@@ -39,11 +39,11 @@ class ClassMapGenerator
     /**
      * Iterate over all files in the given directory searching for classes
      *
-     * @param Iterator|string $dir The directory to search in or an iterator
+     * @param \Iterator|string $dir The directory to search in or an iterator
      *
      * @return array A class map array
      */
-    static public function createMap($dir)
+    public static function createMap($dir)
     {
         if (is_string($dir)) {
             $dir = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir));
@@ -80,10 +80,11 @@ class ClassMapGenerator
      *
      * @return array The found classes
      */
-    static private function findClasses($path)
+    private static function findClasses($path)
     {
         $contents = file_get_contents($path);
         $tokens   = token_get_all($contents);
+        $T_TRAIT  = version_compare(PHP_VERSION, '5.4', '<') ? -1 : T_TRAIT;
 
         $classes = array();
 
@@ -110,6 +111,7 @@ class ClassMapGenerator
                     break;
                 case T_CLASS:
                 case T_INTERFACE:
+                case $T_TRAIT:
                     // Find the classname
                     while (($t = $tokens[++$i]) && is_array($t)) {
                         if (T_STRING === $t[0]) {
@@ -119,11 +121,7 @@ class ClassMapGenerator
                         }
                     }
 
-                    if (empty($namespace)) {
-                        $classes[] = $class;
-                    } else {
-                        $classes[] = $namespace . $class;
-                    }
+                    $classes[] = ltrim($namespace.$class, '\\');
                     break;
                 default:
                     break;

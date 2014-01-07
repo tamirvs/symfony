@@ -11,16 +11,18 @@
 
 namespace Symfony\Bundle\FrameworkBundle\Controller;
 
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\DependencyInjection\ContainerAware;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Form\FormTypeInterface;
 use Symfony\Component\Form\Form;
 use Symfony\Component\Form\FormBuilder;
-use Symfony\Bundle\DoctrineBundle\Registry;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Doctrine\Bundle\DoctrineBundle\Registry;
 
 /**
  * Controller is a simple implementation of a Controller.
@@ -34,35 +36,40 @@ class Controller extends ContainerAware
     /**
      * Generates a URL from the given parameters.
      *
-     * @param string  $route      The name of the route
-     * @param mixed   $parameters An array of parameters
-     * @param Boolean $absolute   Whether to generate an absolute URL
+     * @param string         $route         The name of the route
+     * @param mixed          $parameters    An array of parameters
+     * @param Boolean|string $referenceType The type of reference (one of the constants in UrlGeneratorInterface)
      *
      * @return string The generated URL
+     *
+     * @see UrlGeneratorInterface
      */
-    public function generateUrl($route, $parameters = array(), $absolute = false)
+    public function generateUrl($route, $parameters = array(), $referenceType = UrlGeneratorInterface::ABSOLUTE_PATH)
     {
-        return $this->container->get('router')->generate($route, $parameters, $absolute);
+        return $this->container->get('router')->generate($route, $parameters, $referenceType);
     }
 
     /**
      * Forwards the request to another controller.
      *
-     * @param  string  $controller The controller name (a string like BlogBundle:Post:index)
-     * @param  array   $path       An array of path parameters
-     * @param  array   $query      An array of query parameters
+     * @param string $controller The controller name (a string like BlogBundle:Post:index)
+     * @param array  $path       An array of path parameters
+     * @param array  $query      An array of query parameters
      *
      * @return Response A Response instance
      */
     public function forward($controller, array $path = array(), array $query = array())
     {
-        return $this->container->get('http_kernel')->forward($controller, $path, $query);
+        $path['_controller'] = $controller;
+        $subRequest = $this->container->get('request')->duplicate($query, null, $path);
+
+        return $this->container->get('http_kernel')->handle($subRequest, HttpKernelInterface::SUB_REQUEST);
     }
 
     /**
      * Returns a RedirectResponse to the given URL.
      *
-     * @param string  $url The URL to redirect to
+     * @param string  $url    The URL to redirect to
      * @param integer $status The status code to use for the Response
      *
      * @return RedirectResponse
@@ -78,7 +85,7 @@ class Controller extends ContainerAware
      * @param string $view       The view name
      * @param array  $parameters An array of parameters to pass to the view
      *
-     * @return string The renderer view
+     * @return string The rendered view
      */
     public function renderView($view, array $parameters = array())
     {
@@ -88,9 +95,9 @@ class Controller extends ContainerAware
     /**
      * Renders a view.
      *
-     * @param string   $view The view name
+     * @param string   $view       The view name
      * @param array    $parameters An array of parameters to pass to the view
-     * @param Response $response A response instance
+     * @param Response $response   A response instance
      *
      * @return Response A Response instance
      */
@@ -102,9 +109,9 @@ class Controller extends ContainerAware
     /**
      * Streams a view.
      *
-     * @param string           $view The view name
+     * @param string           $view       The view name
      * @param array            $parameters An array of parameters to pass to the view
-     * @param StreamedResponse $response A response instance
+     * @param StreamedResponse $response   A response instance
      *
      * @return StreamedResponse A StreamedResponse instance
      */
@@ -132,6 +139,9 @@ class Controller extends ContainerAware
      *
      *     throw $this->createNotFoundException('Page not found!');
      *
+     * @param string    $message  A message
+     * @param \Exception $previous The previous exception
+     *
      * @return NotFoundHttpException
      */
     public function createNotFoundException($message = 'Not Found', \Exception $previous = null)
@@ -143,8 +153,8 @@ class Controller extends ContainerAware
      * Creates and returns a Form instance from the type of the form.
      *
      * @param string|FormTypeInterface $type    The built type of the form
-     * @param mixed $data                       The initial data for the form
-     * @param array $options                    Options for the form
+     * @param mixed                    $data    The initial data for the form
+     * @param array                    $options Options for the form
      *
      * @return Form
      */
@@ -156,8 +166,8 @@ class Controller extends ContainerAware
     /**
      * Creates and returns a form builder instance
      *
-     * @param mixed $data               The initial data for the form
-     * @param array $options            Options for the form
+     * @param mixed $data    The initial data for the form
+     * @param array $options Options for the form
      *
      * @return FormBuilder
      */
@@ -170,10 +180,14 @@ class Controller extends ContainerAware
      * Shortcut to return the request service.
      *
      * @return Request
+     *
+     * @deprecated Deprecated since version 2.4, to be removed in 3.0. Ask
+     *             Symfony to inject the Request object into your controller
+     *             method instead by type hinting it in the method's signature.
      */
     public function getRequest()
     {
-        return $this->container->get('request');
+        return $this->container->get('request_stack')->getCurrentRequest();
     }
 
     /**
@@ -221,7 +235,7 @@ class Controller extends ContainerAware
     /**
      * Returns true if the service id is defined.
      *
-     * @param  string  $id The service id
+     * @param string $id The service id
      *
      * @return Boolean true if the service id is defined, false otherwise
      */
@@ -233,7 +247,7 @@ class Controller extends ContainerAware
     /**
      * Gets a service by id.
      *
-     * @param  string $id The service id
+     * @param string $id The service id
      *
      * @return object The service
      */

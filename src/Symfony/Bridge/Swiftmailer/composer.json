@@ -4,7 +4,6 @@
     "description": "Symfony Swiftmailer Bridge",
     "keywords": [],
     "homepage": "http://symfony.com",
-    "version": "2.1.0",
     "license": "MIT",
     "authors": [
         {
@@ -17,14 +16,20 @@
         }
     ],
     "require": {
-        "php": ">=5.3.2",
-        "swiftmailer/swiftmailer": ">=4.1.2,<4.2-dev"
+        "php": ">=5.3.3",
+        "swiftmailer/swiftmailer": ">=4.2.0,<5.1-dev"
     },
     "suggest": {
-        "symfony/http-kernel": "self.version"
+        "symfony/http-kernel": ""
     },
     "autoload": {
-        "psr-0": { "Symfony\\Bridge\\Swiftmailer": "" }
+        "psr-0": { "Symfony\\Bridge\\Swiftmailer\\": "" }
     },
-    "target-dir": "Symfony/Bridge/Swiftmailer"
+    "target-dir": "Symfony/Bridge/Swiftmailer",
+    "minimum-stability": "dev",
+    "extra": {
+        "branch-alias": {
+            "dev-master": "2.5-dev"
+        }
+    }
 }

@@ -28,7 +28,7 @@ use Symfony\Component\Templating\Asset\PackageInterface;
 class CoreAssetsHelper extends Helper implements PackageInterface
 {
     protected $defaultPackage;
-    protected $namedPackages;
+    protected $namedPackages = array();
 
     /**
      * Constructor.
@@ -39,7 +39,6 @@ class CoreAssetsHelper extends Helper implements PackageInterface
     public function __construct(PackageInterface $defaultPackage, array $namedPackages = array())
     {
         $this->defaultPackage = $defaultPackage;
-        $this->namedPackages = array();
 
         foreach ($namedPackages as $name => $package) {
             $this->addPackage($name, $package);
@@ -74,7 +73,7 @@ class CoreAssetsHelper extends Helper implements PackageInterface
      *
      * @return PackageInterface An asset package
      *
-     * @throws InvalidArgumentException If there is no package by that name
+     * @throws \InvalidArgumentException If there is no package by that name
      */
     public function getPackage($name = null)
     {

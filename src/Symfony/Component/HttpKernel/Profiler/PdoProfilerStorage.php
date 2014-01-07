@@ -11,7 +11,6 @@
 
 namespace Symfony\Component\HttpKernel\Profiler;
 
-
 /**
  * Base PDO storage for profiling information in a PDO database.
  *
@@ -45,9 +44,17 @@ abstract class PdoProfilerStorage implements ProfilerStorageInterface
     /**
      * {@inheritdoc}
      */
-    public function find($ip, $url, $limit, $method)
+    public function find($ip, $url, $limit, $method, $start = null, $end = null)
     {
-        list($criteria, $args) = $this->buildCriteria($ip, $url, $limit, $method);
+        if (null === $start) {
+            $start = 0;
+        }
+
+        if (null === $end) {
+            $end = time();
+        }
+
+        list($criteria, $args) = $this->buildCriteria($ip, $url, $start, $end, $limit, $method);
 
         $criteria = $criteria ? 'WHERE '.implode(' AND ', $criteria) : '';
 
@@ -92,7 +99,7 @@ abstract class PdoProfilerStorage implements ProfilerStorageInterface
         );
 
         try {
-            if ($this->read($profile->getToken())) {
+            if ($this->has($profile->getToken())) {
                 $this->exec($db, 'UPDATE sf_profiler_data SET parent = :parent, data = :data, ip = :ip, method = :method, url = :url, time = :time, created_at = :created_at WHERE token = :token', $args);
             } else {
                 $this->exec($db, 'INSERT INTO sf_profiler_data (token, parent, data, ip, method, url, time, created_at) VALUES (:token, :parent, :data, :ip, :method, :url, :time, :created_at)', $args);
@@ -121,14 +128,16 @@ abstract class PdoProfilerStorage implements ProfilerStorageInterface
     /**
      * Build SQL criteria to fetch records by ip and url
      *
-     * @param string $ip    The IP
-     * @param string $url   The URL
-     * @param string $limit The maximum number of tokens to return
+     * @param string $ip     The IP
+     * @param string $url    The URL
+     * @param string $start  The start period to search from
+     * @param string $end    The end period to search to
+     * @param string $limit  The maximum number of tokens to return
      * @param string $method The request method
      *
      * @return array An array with (criteria, args)
      */
-    abstract protected function buildCriteria($ip, $url, $limit, $method);
+    abstract protected function buildCriteria($ip, $url, $start, $end, $limit, $method);
 
     /**
      * Initializes the database
@@ -214,10 +223,10 @@ abstract class PdoProfilerStorage implements ProfilerStorageInterface
     /**
      * Reads the child profiles for the given token.
      *
-     * @param string $token The parent token
+     * @param string $token  The parent token
      * @param string $parent The parent instance
      *
-     * @return array An array of Profile instance
+     * @return Profile[] An array of Profile instance
      */
     protected function readChildren($token, $parent)
     {
@@ -235,5 +244,21 @@ abstract class PdoProfilerStorage implements ProfilerStorageInterface
         }
 
         return $profiles;
+    }
+
+    /**
+     * Returns whether data for the given token already exists in storage.
+     *
+     * @param string $token The profile token
+     *
+     * @return string
+     */
+    protected function has($token)
+    {
+        $db = $this->initDb();
+        $tokenExists = $this->fetch($db, 'SELECT 1 FROM sf_profiler_data WHERE token = :token LIMIT 1', array(':token' => $token));
+        $this->close($db);
+
+        return !empty($tokenExists);
     }
 }

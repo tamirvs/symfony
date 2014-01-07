@@ -59,7 +59,7 @@ class DaoAuthenticationProvider extends UserAuthenticationProvider
                 throw new BadCredentialsException('The credentials were changed from another session.');
             }
         } else {
-            if (!$presentedPassword = $token->getCredentials()) {
+            if ("" === ($presentedPassword = $token->getCredentials())) {
                 throw new BadCredentialsException('The presented password cannot be empty.');
             }
 
@@ -88,9 +88,12 @@ class DaoAuthenticationProvider extends UserAuthenticationProvider
 
             return $user;
         } catch (UsernameNotFoundException $notFound) {
+            $notFound->setUsername($username);
             throw $notFound;
         } catch (\Exception $repositoryProblem) {
-            throw new AuthenticationServiceException($repositoryProblem->getMessage(), $token, 0, $repositoryProblem);
+            $ex = new AuthenticationServiceException($repositoryProblem->getMessage(), 0, $repositoryProblem);
+            $ex->setToken($token);
+            throw $ex;
         }
     }
 }

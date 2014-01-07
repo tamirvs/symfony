@@ -11,42 +11,20 @@
 
 namespace Symfony\Component\Form\Extension\Core\ChoiceList;
 
-
-use Symfony\Component\Form\Exception\UnexpectedTypeException;
-
 /**
  * A choice list for choices of type string or integer.
  *
  * Choices and their associated labels can be passed in a single array. Since
  * choices are passed as array keys, only strings or integer choices are
- * allowed.
+ * allowed. Choices may also be given as hierarchy of unlimited depth by
+ * creating nested arrays. The title of the sub-hierarchy can be stored in the
+ * array key pointing to the nested array.
  *
  * <code>
  * $choiceList = new SimpleChoiceList(array(
  *     'creditcard' => 'Credit card payment',
  *     'cash' => 'Cash payment',
  * ));
- * </code>
- *
- * The default value generation strategy is `ChoiceList::COPY_CHOICE`, because
- * choice values must be scalar, and the choices passed to this choice list
- * are guaranteed to be scalar.
- *
- * The default index generation strategy is `ChoiceList::GENERATE`, so that
- * your choices can also contain values that are illegal as indices. If your
- * choices are guaranteed to start with a letter, digit or underscore and only
- * contain letters, digits, underscores, hyphens and colons, you can set the
- * strategy to `ChoiceList::COPY_CHOICE` instead.
- *
- * <code>
- * $choices = array(
- *     'creditcard' => 'Credit card payment',
- *     'cash' => 'Cash payment',
- * );
- *
- * // value generation: COPY_CHOICE (the default)
- * // index generation: COPY_CHOICE (custom)
- * $choiceList = new SimpleChoiceList($choices, array(), ChoiceList::COPY_CHOICE, ChoiceList::COPY_CHOICE);
  * </code>
  *
  * @author Bernhard Schussek <bschussek@gmail.com>
@@ -56,23 +34,42 @@ class SimpleChoiceList extends ChoiceList
     /**
      * Creates a new simple choice list.
      *
-     * @param array   $choices          The array of choices with the choices as keys and
-     *                                  the labels as values. Choices may also be given
-     *                                  as hierarchy of unlimited depth. Hierarchies are
-     *                                  created by creating nested arrays. The title of
-     *                                  the sub-hierarchy is stored in the array
-     *                                  key pointing to the nested array.
-     * @param array   $preferredChoices A flat array of choices that should be
-     *                                  presented to the user with priority.
-     * @param integer $valueStrategy    The strategy used to create choice values.
-     *                                  One of COPY_CHOICE and GENERATE.
-     * @param integer $indexStrategy    The strategy used to create choice indices.
-     *                                  One of COPY_CHOICE and GENERATE.
+     * @param array $choices The array of choices with the choices as keys and
+     *                       the labels as values. Choices may also be given
+     *                       as hierarchy of unlimited depth by creating nested
+     *                       arrays. The title of the sub-hierarchy is stored
+     *                       in the array key pointing to the nested array.
+     * @param array $preferredChoices A flat array of choices that should be
+     *                                presented to the user with priority.
      */
-    public function __construct(array $choices, array $preferredChoices = array(), $valueStrategy = self::COPY_CHOICE, $indexStrategy = self::GENERATE)
+    public function __construct(array $choices, array $preferredChoices = array())
     {
         // Flip preferred choices to speed up lookup
-        parent::__construct($choices, $choices, array_flip($preferredChoices), $valueStrategy, $indexStrategy);
+        parent::__construct($choices, $choices, array_flip($preferredChoices));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getChoicesForValues(array $values)
+    {
+        $values = $this->fixValues($values);
+
+        // The values are identical to the choices, so we can just return them
+        // to improve performance a little bit
+        return $this->fixChoices(array_intersect($values, $this->getValues()));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getValuesForChoices(array $choices)
+    {
+        $choices = $this->fixChoices($choices);
+
+        // The choices are identical to the values, so we can just return them
+        // to improve performance a little bit
+        return $this->fixValues(array_intersect($choices, $this->getValues()));
     }
 
     /**
@@ -81,17 +78,15 @@ class SimpleChoiceList extends ChoiceList
      * Takes care of splitting the single $choices array passed in the
      * constructor into choices and labels.
      *
-     * @param array $bucketForPreferred
-     * @param array $bucketForRemaining
-     * @param array $choices
-     * @param array $labels
-     * @param array $preferredChoices
-     *
-     * @throws UnexpectedTypeException
-     *
-     * @see parent::addChoices
+     * @param array              $bucketForPreferred The bucket where to store the preferred
+     *                                               view objects.
+     * @param array              $bucketForRemaining The bucket where to store the
+     *                                               non-preferred view objects.
+     * @param array|\Traversable $choices            The list of choices.
+     * @param array              $labels             Ignored.
+     * @param array              $preferredChoices   The preferred choices.
      */
-    protected function addChoices(&$bucketForPreferred, &$bucketForRemaining, $choices, $labels, array $preferredChoices)
+    protected function addChoices(array &$bucketForPreferred, array &$bucketForRemaining, $choices, array $labels, array $preferredChoices)
     {
         // Add choices to the nested buckets
         foreach ($choices as $choice => $label) {
@@ -126,10 +121,12 @@ class SimpleChoiceList extends ChoiceList
      * Optimized for performance by treating the preferred choices as array
      * where choices are stored in the keys.
      *
-     * @param mixed $choice The choice to test.
+     * @param mixed $choice           The choice to test.
      * @param array $preferredChoices An array of preferred choices.
+     *
+     * @return Boolean Whether the choice is preferred.
      */
-    protected function isPreferred($choice, $preferredChoices)
+    protected function isPreferred($choice, array $preferredChoices)
     {
         // Optimize performance over the default implementation
         return isset($preferredChoices[$choice]);
@@ -138,25 +135,30 @@ class SimpleChoiceList extends ChoiceList
     /**
      * Converts the choice to a valid PHP array key.
      *
-     * @param mixed $choice The choice.
+     * @param mixed $choice The choice
      *
-     * @return string|integer A valid PHP array key.
+     * @return string|integer A valid PHP array key
      */
     protected function fixChoice($choice)
     {
         return $this->fixIndex($choice);
     }
 
-
     /**
-     * Converts the choices to valid PHP array keys.
-     *
-     * @param array $choices The choices.
-     *
-     * @return array Valid PHP array keys.
+     * {@inheritdoc}
      */
     protected function fixChoices(array $choices)
     {
         return $this->fixIndices($choices);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function createValue($choice)
+    {
+        // Choices are guaranteed to be unique and scalar, so we can simply
+        // convert them to strings
+        return (string) $choice;
     }
 }

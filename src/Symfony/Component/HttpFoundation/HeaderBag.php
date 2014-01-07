@@ -18,10 +18,10 @@ namespace Symfony\Component\HttpFoundation;
  *
  * @api
  */
-class HeaderBag
+class HeaderBag implements \IteratorAggregate, \Countable
 {
-    protected $headers;
-    protected $cacheControl;
+    protected $headers = array();
+    protected $cacheControl = array();
 
     /**
      * Constructor.
@@ -32,8 +32,6 @@ class HeaderBag
      */
     public function __construct(array $headers = array())
     {
-        $this->cacheControl = array();
-        $this->headers = array();
         foreach ($headers as $key => $values) {
             $this->set($key, $values);
         }
@@ -50,16 +48,13 @@ class HeaderBag
             return '';
         }
 
-        $beautifier = function ($name) {
-            return preg_replace_callback('/\-(.)/', function ($match) { return '-'.strtoupper($match[1]); }, ucfirst($name));
-        };
-
         $max = max(array_map('strlen', array_keys($this->headers))) + 1;
         $content = '';
         ksort($this->headers);
         foreach ($this->headers as $name => $values) {
+            $name = implode('-', array_map('ucfirst', explode('-', $name)));
             foreach ($values as $value) {
-                $content .= sprintf("%-{$max}s %s\r\n", $beautifier($name).':', $value);
+                $content .= sprintf("%-{$max}s %s\r\n", $name.':', $value);
             }
         }
 
@@ -93,7 +88,7 @@ class HeaderBag
     /**
      * Replaces the current HTTP headers by a new set.
      *
-     * @param array  $headers An array of HTTP headers
+     * @param array $headers An array of HTTP headers
      *
      * @api
      */
@@ -106,7 +101,7 @@ class HeaderBag
     /**
      * Adds new headers the current HTTP headers set.
      *
-     * @param array  $headers An array of HTTP headers
+     * @param array $headers An array of HTTP headers
      *
      * @api
      */
@@ -152,7 +147,7 @@ class HeaderBag
      *
      * @param string       $key     The key
      * @param string|array $values  The value or an array of values
-     * @param Boolean      $replace Whether to replace the actual value of not (true by default)
+     * @param Boolean      $replace Whether to replace the actual value or not (true by default)
      *
      * @api
      */
@@ -160,7 +155,7 @@ class HeaderBag
     {
         $key = strtr(strtolower($key), '_', '-');
 
-        $values = (array) $values;
+        $values = array_values((array) $values);
 
         if (true === $replace || !isset($this->headers[$key])) {
             $this->headers[$key] = $values;
@@ -226,7 +221,9 @@ class HeaderBag
      * @param string    $key     The parameter key
      * @param \DateTime $default The default value
      *
-     * @return \DateTime The filtered value
+     * @return null|\DateTime The parsed DateTime or the default value if the header does not exist
+     *
+     * @throws \RuntimeException When the HTTP header is not parseable
      *
      * @api
      */
@@ -267,6 +264,26 @@ class HeaderBag
         $this->set('Cache-Control', $this->getCacheControlHeader());
     }
 
+    /**
+     * Returns an iterator for headers.
+     *
+     * @return \ArrayIterator An \ArrayIterator instance
+     */
+    public function getIterator()
+    {
+        return new \ArrayIterator($this->headers);
+    }
+
+    /**
+     * Returns the number of headers.
+     *
+     * @return int The number of headers
+     */
+    public function count()
+    {
+        return count($this->headers);
+    }
+
     protected function getCacheControlHeader()
     {
         $parts = array();
@@ -298,7 +315,7 @@ class HeaderBag
         $cacheControl = array();
         preg_match_all('#([a-zA-Z][a-zA-Z_-]*)\s*(?:=(?:"([^"]*)"|([^ \t",;]*)))?#', $header, $matches, PREG_SET_ORDER);
         foreach ($matches as $match) {
-            $cacheControl[strtolower($match[1])] = isset($match[2]) && $match[2] ? $match[2] : (isset($match[3]) ? $match[3] : true);
+            $cacheControl[strtolower($match[1])] = isset($match[3]) ? $match[3] : (isset($match[2]) ? $match[2] : true);
         }
 
         return $cacheControl;

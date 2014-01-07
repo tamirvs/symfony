@@ -11,6 +11,9 @@
 
 namespace Symfony\Component\Process;
 
+use Symfony\Component\Process\Exception\InvalidArgumentException;
+use Symfony\Component\Process\Exception\LogicException;
+
 /**
  * Process builder.
  *
@@ -20,29 +23,61 @@ class ProcessBuilder
 {
     private $arguments;
     private $cwd;
-    private $env;
+    private $env = array();
     private $stdin;
-    private $timeout;
-    private $options;
-    private $inheritEnv;
+    private $timeout = 60;
+    private $options = array();
+    private $inheritEnv = true;
+    private $prefix = array();
 
     public function __construct(array $arguments = array())
     {
         $this->arguments = $arguments;
+    }
 
-        $this->timeout = 60;
-        $this->options = array();
-        $this->inheritEnv = false;
+    public static function create(array $arguments = array())
+    {
+        return new static($arguments);
     }
 
     /**
      * Adds an unescaped argument to the command string.
      *
      * @param string $argument A command argument
+     *
+     * @return ProcessBuilder
      */
     public function add($argument)
     {
         $this->arguments[] = $argument;
+
+        return $this;
+    }
+
+    /**
+     * Adds an unescaped prefix to the command string.
+     *
+     * The prefix is preserved when resetting arguments.
+     *
+     * @param string|array $prefix A command prefix or an array of command prefixes
+     *
+     * @return ProcessBuilder
+     */
+    public function setPrefix($prefix)
+    {
+        $this->prefix = is_array($prefix) ? $prefix : array($prefix);
+
+        return $this;
+    }
+
+    /**
+     * @param array $arguments
+     *
+     * @return ProcessBuilder
+     */
+    public function setArguments(array $arguments)
+    {
+        $this->arguments = $arguments;
 
         return $this;
     }
@@ -63,11 +98,14 @@ class ProcessBuilder
 
     public function setEnv($name, $value)
     {
-        if (null === $this->env) {
-            $this->env = array();
-        }
-
         $this->env[$name] = $value;
+
+        return $this;
+    }
+
+    public function addEnvironmentVariables(array $variables)
+    {
+        $this->env = array_replace($this->env, $variables);
 
         return $this;
     }
@@ -79,8 +117,31 @@ class ProcessBuilder
         return $this;
     }
 
+    /**
+     * Sets the process timeout.
+     *
+     * To disable the timeout, set this value to null.
+     *
+     * @param float|null
+     *
+     * @return ProcessBuilder
+     *
+     * @throws InvalidArgumentException
+     */
     public function setTimeout($timeout)
     {
+        if (null === $timeout) {
+            $this->timeout = null;
+
+            return $this;
+        }
+
+        $timeout = (float) $timeout;
+
+        if ($timeout < 0) {
+            throw new InvalidArgumentException('The timeout value must be a valid positive integer or float number.');
+        }
+
         $this->timeout = $timeout;
 
         return $this;
@@ -95,29 +156,21 @@ class ProcessBuilder
 
     public function getProcess()
     {
-        if (!count($this->arguments)) {
-            throw new \LogicException('You must add() command arguments before calling getProcess().');
+        if (0 === count($this->prefix) && 0 === count($this->arguments)) {
+            throw new LogicException('You must add() command arguments before calling getProcess().');
         }
 
         $options = $this->options;
 
-        if (defined('PHP_WINDOWS_VERSION_MAJOR')) {
-            $options['bypass_shell'] = true;
+        $arguments = array_merge($this->prefix, $this->arguments);
+        $script = implode(' ', array_map(array(__NAMESPACE__.'\\ProcessUtils', 'escapeArgument'), $arguments));
 
-            $arguments = $this->arguments;
-            $command = array_shift($arguments);
-
-            $script = '"'.$command.'"';
-            if ($arguments) {
-                $script .= ' '.implode(' ', array_map('escapeshellarg', $arguments));
-            }
-
-            $script = 'cmd /V:ON /E:ON /C "'.$script.'"';
+        if ($this->inheritEnv) {
+            // include $_ENV for BC purposes
+            $env = array_replace($_ENV, $_SERVER, $this->env);
         } else {
-            $script = implode(' ', array_map('escapeshellarg', $this->arguments));
+            $env = $this->env;
         }
-
-        $env = $this->inheritEnv && $_ENV ? ($this->env ?: array()) + $_ENV : $this->env;
 
         return new Process($script, $this->cwd, $env, $this->stdin, $this->timeout, $options);
     }

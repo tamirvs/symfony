@@ -14,10 +14,15 @@ namespace Symfony\Component\Form;
 /**
  * Wraps errors in forms
  *
- * @author Bernhard Schussek <bernhard.schussek@symfony.com>
+ * @author Bernhard Schussek <bschussek@gmail.com>
  */
 class FormError
 {
+    /**
+     * @var string
+     */
+    private $message;
+
     /**
      * The template for the error message
      * @var string
@@ -31,20 +36,31 @@ class FormError
     protected $messageParameters;
 
     /**
+     * The value for error message pluralization
+     * @var integer|null
+     */
+    protected $messagePluralization;
+
+    /**
      * Constructor
      *
      * Any array key in $messageParameters will be used as a placeholder in
      * $messageTemplate.
-     * @see Symfony\Component\Translation\Translator
      *
-     * @param string $messageTemplate      The template for the error message
-     * @param array $messageParameters     The parameters that should be
-     *                                     substituted in the message template.
+     * @param string       $message              The translated error message
+     * @param string|null  $messageTemplate      The template for the error message
+     * @param array        $messageParameters    The parameters that should be
+     *                                           substituted in the message template.
+     * @param integer|null $messagePluralization The value for error message pluralization
+     *
+     * @see \Symfony\Component\Translation\Translator
      */
-    public function __construct($messageTemplate, array $messageParameters = array())
+    public function __construct($message, $messageTemplate = null, array $messageParameters = array(), $messagePluralization = null)
     {
-        $this->messageTemplate = $messageTemplate;
+        $this->message = $message;
+        $this->messageTemplate = $messageTemplate ?: $message;
         $this->messageParameters = $messageParameters;
+        $this->messagePluralization = $messagePluralization;
     }
 
     /**
@@ -54,7 +70,7 @@ class FormError
      */
     public function getMessage()
     {
-        return strtr($this->messageTemplate, $this->messageParameters);
+        return $this->message;
     }
 
     /**
@@ -75,5 +91,15 @@ class FormError
     public function getMessageParameters()
     {
         return $this->messageParameters;
+    }
+
+    /**
+     * Returns the value for error message pluralization.
+     *
+     * @return integer|null
+     */
+    public function getMessagePluralization()
+    {
+        return $this->messagePluralization;
     }
 }

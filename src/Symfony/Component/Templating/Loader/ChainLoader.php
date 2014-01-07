@@ -11,7 +11,7 @@
 
 namespace Symfony\Component\Templating\Loader;
 
-use Symfony\Component\Templating\Storage;
+use Symfony\Component\Templating\Storage\Storage;
 use Symfony\Component\Templating\TemplateReferenceInterface;
 
 /**
@@ -21,16 +21,15 @@ use Symfony\Component\Templating\TemplateReferenceInterface;
  */
 class ChainLoader extends Loader
 {
-    protected $loaders;
+    protected $loaders = array();
 
     /**
      * Constructor.
      *
-     * @param Loader[] $loaders An array of loader instances
+     * @param LoaderInterface[] $loaders An array of loader instances
      */
     public function __construct(array $loaders = array())
     {
-        $this->loaders = array();
         foreach ($loaders as $loader) {
             $this->addLoader($loader);
         }
@@ -39,9 +38,9 @@ class ChainLoader extends Loader
     /**
      * Adds a loader instance.
      *
-     * @param Loader $loader A Loader instance
+     * @param LoaderInterface $loader A Loader instance
      */
-    public function addLoader(Loader $loader)
+    public function addLoader(LoaderInterface $loader)
     {
         $this->loaders[] = $loader;
     }
@@ -75,7 +74,7 @@ class ChainLoader extends Loader
     public function isFresh(TemplateReferenceInterface $template, $time)
     {
         foreach ($this->loaders as $loader) {
-            return $loader->isFresh($template);
+            return $loader->isFresh($template, $time);
         }
 
         return false;

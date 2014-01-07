@@ -62,6 +62,11 @@ class InlineServiceDefinitionsPass implements RepeatablePassInterface
             $definition->setProperties(
                 $this->inlineArguments($container, $definition->getProperties())
             );
+
+            $configurator = $this->inlineArguments($container, array($definition->getConfigurator()));
+            $definition->setConfigurator(
+                $configurator[0]
+            );
         }
     }
 
@@ -70,6 +75,8 @@ class InlineServiceDefinitionsPass implements RepeatablePassInterface
      *
      * @param ContainerBuilder $container The ContainerBuilder
      * @param array            $arguments An array of arguments
+     *
+     * @return array
      */
     private function inlineArguments(ContainerBuilder $container, array $arguments)
     {
@@ -81,7 +88,7 @@ class InlineServiceDefinitionsPass implements RepeatablePassInterface
                     continue;
                 }
 
-                if ($this->isInlinableDefinition($container, $id, $definition = $container->getDefinition($id))) {
+                if ($this->isInlineableDefinition($container, $id, $definition = $container->getDefinition($id))) {
                     $this->compiler->addLogMessage($this->formatter->formatInlineService($this, $id, $this->currentId));
 
                     if (ContainerInterface::SCOPE_PROTOTYPE !== $definition->getScope()) {
@@ -109,18 +116,22 @@ class InlineServiceDefinitionsPass implements RepeatablePassInterface
      *
      * @return Boolean If the definition is inlineable
      */
-    private function isInlinableDefinition(ContainerBuilder $container, $id, Definition $definition)
+    private function isInlineableDefinition(ContainerBuilder $container, $id, Definition $definition)
     {
         if (ContainerInterface::SCOPE_PROTOTYPE === $definition->getScope()) {
             return true;
         }
 
-        if ($definition->isPublic()) {
+        if ($definition->isPublic() || $definition->isLazy()) {
             return false;
         }
 
         if (!$this->graph->hasNode($id)) {
             return true;
+        }
+
+        if ($this->currentId == $id) {
+            return false;
         }
 
         $ids = array();

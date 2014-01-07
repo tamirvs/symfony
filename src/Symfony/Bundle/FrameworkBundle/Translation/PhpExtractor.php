@@ -16,7 +16,7 @@ use Symfony\Component\Translation\MessageCatalogue;
 use Symfony\Component\Translation\Extractor\ExtractorInterface;
 
 /**
- * PhpExtractor extracts translation messages from a php template.
+ * PhpExtractor extracts translation messages from a PHP template.
  *
  * @author Michel Salib <michelsalib@hotmail.com>
  */
@@ -88,9 +88,9 @@ class PhpExtractor implements ExtractorInterface
     }
 
     /**
-     * Extracts trans message from php tokens.
+     * Extracts trans message from PHP tokens.
      *
-     * @param array $tokens
+     * @param array            $tokens
      * @param MessageCatalogue $catalog
      */
     protected function parseTokens($tokens, MessageCatalogue $catalog)
@@ -100,7 +100,7 @@ class PhpExtractor implements ExtractorInterface
                 $message = '';
 
                 foreach ($sequence as $id => $item) {
-                    if($this->normalizeToken($tokens[$key + $id]) == $item) {
+                    if ($this->normalizeToken($tokens[$key + $id]) == $item) {
                         continue;
                     } elseif (self::MESSAGE_TOKEN == $item) {
                         $message = $this->normalizeToken($tokens[$key + $id]);
@@ -111,7 +111,7 @@ class PhpExtractor implements ExtractorInterface
                     }
                 }
 
-                $message = trim($message, '\'');
+                $message = trim($message, '\'"');
 
                 if ($message) {
                     $catalog->set($message, $this->prefix.$message);

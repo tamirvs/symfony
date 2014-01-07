@@ -1,12 +1,12 @@
 <?php
 
 /*
- * This file is part of the Symfony framework.
+ * This file is part of the Symfony package.
  *
  * (c) Fabien Potencier <fabien@symfony.com>
  *
- * This source file is subject to the MIT license that is bundled
- * with this source code in the file LICENSE.
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 namespace Symfony\Component\DependencyInjection\Compiler;
@@ -73,6 +73,17 @@ class CheckDefinitionValidityPass implements CompilerPassInterface
                    .'please add abstract=true, otherwise specify a class to get rid of this error.',
                    $id
                 ));
+            }
+
+            // tag attribute values must be scalars
+            foreach ($definition->getTags() as $name => $tags) {
+                foreach ($tags as $attributes) {
+                    foreach ($attributes as $attribute => $value) {
+                        if (!is_scalar($value) && null !== $value) {
+                            throw new RuntimeException(sprintf('A "tags" attribute must be of a scalar-type for service "%s", tag "%s", attribute "%s".', $id, $name, $attribute));
+                        }
+                    }
+                }
             }
         }
     }

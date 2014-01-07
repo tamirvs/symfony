@@ -12,27 +12,25 @@
 namespace Symfony\Component\Form\Extension\Core\Type;
 
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\ChoiceList\ChoiceList;
-use Symfony\Component\Locale\Locale;
+use Symfony\Component\Intl\Intl;
+use Symfony\Component\OptionsResolver\OptionsResolverInterface;
 
 class CountryType extends AbstractType
 {
     /**
      * {@inheritdoc}
      */
-    public function getDefaultOptions(array $options)
+    public function setDefaultOptions(OptionsResolverInterface $resolver)
     {
-        return array(
-            'choices' => Locale::getDisplayCountries(\Locale::getDefault()),
-            'value_strategy' => ChoiceList::COPY_CHOICE,
-            'index_strategy' => ChoiceList::COPY_CHOICE,
-        );
+        $resolver->setDefaults(array(
+            'choices' => Intl::getRegionBundle()->getCountryNames(),
+        ));
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getParent(array $options)
+    public function getParent()
     {
         return 'choice';
     }

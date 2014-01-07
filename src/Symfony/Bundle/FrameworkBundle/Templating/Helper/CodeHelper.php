@@ -114,15 +114,26 @@ class CodeHelper extends Helper
     /**
      * Returns an excerpt of a code file around the given line number.
      *
-     * @param string $file  A file path
-     * @param int    $line  The selected line number
+     * @param string $file A file path
+     * @param int    $line The selected line number
      *
      * @return string An HTML string
      */
     public function fileExcerpt($file, $line)
     {
         if (is_readable($file)) {
-            $code = highlight_file($file, true);
+            if (extension_loaded('fileinfo')) {
+                $finfo = new \Finfo();
+
+                // Check if the file is an application/octet-stream (eg. Phar file) because highlight_file cannot parse these files
+                if ('application/octet-stream' === $finfo->file($file, FILEINFO_MIME_TYPE)) {
+                    return;
+                }
+            }
+
+            // highlight_file could throw warnings
+            // see https://bugs.php.net/bug.php?id=25725
+            $code = @highlight_file($file, true);
             // remove main code/span tags
             $code = preg_replace('#^<code.*?>\s*<span.*?>(.*)</span>\s*</code>#s', '\\1', $code);
             $content = preg_split('#<br />#', $code);
@@ -139,9 +150,9 @@ class CodeHelper extends Helper
     /**
      * Formats a file path.
      *
-     * @param  string  $file An absolute file path
-     * @param  integer $line The line number
-     * @param  string  $text Use this text for the link rather than the file path
+     * @param string  $file An absolute file path
+     * @param integer $line The line number
+     * @param string  $text Use this text for the link rather than the file path
      *
      * @return string
      */
@@ -168,8 +179,8 @@ class CodeHelper extends Helper
     /**
      * Returns the link for a given file/line pair.
      *
-     * @param  string  $file An absolute file path
-     * @param  integer $line The line number
+     * @param string  $file An absolute file path
+     * @param integer $line The line number
      *
      * @return string A link of false
      */
@@ -201,7 +212,7 @@ class CodeHelper extends Helper
         return 'code';
     }
 
-    static protected function fixCodeMarkup($line)
+    protected static function fixCodeMarkup($line)
     {
         // </span> ending tag from previous line
         $opening = strpos($line, '<span');

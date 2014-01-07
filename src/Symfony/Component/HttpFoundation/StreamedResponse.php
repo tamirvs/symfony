@@ -34,9 +34,9 @@ class StreamedResponse extends Response
     /**
      * Constructor.
      *
-     * @param mixed   $callback A valid PHP callback
-     * @param integer $status   The response status code
-     * @param array   $headers  An array of response headers
+     * @param callable|null $callback A valid PHP callback or null to set it later
+     * @param integer       $status   The response status code
+     * @param array         $headers  An array of response headers
      *
      * @api
      */
@@ -51,34 +51,46 @@ class StreamedResponse extends Response
     }
 
     /**
+     * Factory method for chainability
+     *
+     * @param callable|null $callback A valid PHP callback or null to set it later
+     * @param integer       $status   The response status code
+     * @param array         $headers  An array of response headers
+     *
+     * @return StreamedResponse
+     */
+    public static function create($callback = null, $status = 200, $headers = array())
+    {
+        return new static($callback, $status, $headers);
+    }
+
+    /**
      * Sets the PHP callback associated with this Response.
      *
-     * @param mixed $callback A valid PHP callback
+     * @param callable $callback A valid PHP callback
+     *
+     * @throws \LogicException
      */
     public function setCallback($callback)
     {
-        $this->callback = $callback;
-        if (!is_callable($this->callback)) {
+        if (!is_callable($callback)) {
             throw new \LogicException('The Response callback must be a valid PHP callable.');
         }
+        $this->callback = $callback;
     }
 
     /**
-     * @{inheritdoc}
+     * {@inheritdoc}
      */
     public function prepare(Request $request)
     {
-        if ('1.0' != $request->server->get('SERVER_PROTOCOL')) {
-            $this->setProtocolVersion('1.1');
-        }
-
         $this->headers->set('Cache-Control', 'no-cache');
 
-        parent::prepare($request);
+        return parent::prepare($request);
     }
 
     /**
-     * @{inheritdoc}
+     * {@inheritdoc}
      *
      * This method only sends the content once.
      */
@@ -98,7 +110,7 @@ class StreamedResponse extends Response
     }
 
     /**
-     * @{inheritdoc}
+     * {@inheritdoc}
      *
      * @throws \LogicException when the content is not null
      */
@@ -110,7 +122,7 @@ class StreamedResponse extends Response
     }
 
     /**
-     * @{inheritdoc}
+     * {@inheritdoc}
      *
      * @return false
      */

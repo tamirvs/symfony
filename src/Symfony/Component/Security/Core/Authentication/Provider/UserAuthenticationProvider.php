@@ -19,6 +19,7 @@ use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 use Symfony\Component\Security\Core\Exception\AuthenticationServiceException;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Role\SwitchUserRole;
 
 /**
  * UserProviderInterface retrieves users for UsernamePasswordToken tokens.
@@ -37,6 +38,8 @@ abstract class UserAuthenticationProvider implements AuthenticationProviderInter
      * @param UserCheckerInterface $userChecker                An UserCheckerInterface interface
      * @param string               $providerKey                A provider key
      * @param Boolean              $hideUserNotFoundExceptions Whether to hide user not found exception or not
+     *
+     * @throws \InvalidArgumentException
      */
     public function __construct(UserCheckerInterface $userChecker, $providerKey, $hideUserNotFoundExceptions = true)
     {
@@ -69,6 +72,7 @@ abstract class UserAuthenticationProvider implements AuthenticationProviderInter
             if ($this->hideUserNotFoundExceptions) {
                 throw new BadCredentialsException('Bad credentials', 0, $notFound);
             }
+            $notFound->setUsername($username);
 
             throw $notFound;
         }
@@ -89,7 +93,7 @@ abstract class UserAuthenticationProvider implements AuthenticationProviderInter
             throw $e;
         }
 
-        $authenticatedToken = new UsernamePasswordToken($user, $token->getCredentials(), $this->providerKey, $user->getRoles());
+        $authenticatedToken = new UsernamePasswordToken($user, $token->getCredentials(), $this->providerKey, $this->getRoles($user, $token));
         $authenticatedToken->setAttributes($token->getAttributes());
 
         return $authenticatedToken;
@@ -104,12 +108,35 @@ abstract class UserAuthenticationProvider implements AuthenticationProviderInter
     }
 
     /**
+     * Retrieves roles from user and appends SwitchUserRole if original token contained one.
+     *
+     * @param UserInterface  $user  The user
+     * @param TokenInterface $token The token
+     *
+     * @return Role[] The user roles
+     */
+    private function getRoles(UserInterface $user, TokenInterface $token)
+    {
+        $roles = $user->getRoles();
+
+        foreach ($token->getRoles() as $role) {
+            if ($role instanceof SwitchUserRole) {
+                $roles[] = $role;
+
+                break;
+            }
+        }
+
+        return $roles;
+    }
+
+    /**
      * Retrieves the user from an implementation-specific location.
      *
      * @param string                $username The username to retrieve
      * @param UsernamePasswordToken $token    The Token
      *
-     * @return array The user
+     * @return UserInterface The user
      *
      * @throws AuthenticationException if the credentials could not be validated
      */

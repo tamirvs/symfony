@@ -11,6 +11,9 @@
 
 namespace Symfony\Component\Form;
 
+use Symfony\Component\Form\Exception\UnexpectedTypeException;
+use Symfony\Component\Form\Exception\TransformationFailedException;
+
 class CallbackTransformer implements DataTransformerInterface
 {
     /**
@@ -28,8 +31,8 @@ class CallbackTransformer implements DataTransformerInterface
     /**
      * Constructor.
      *
-     * @param \Closure $transform           The forward transform callback
-     * @param \Closure $reverseTransform    The reverse transform callback
+     * @param \Closure $transform        The forward transform callback
+     * @param \Closure $reverseTransform The reverse transform callback
      */
     public function __construct(\Closure $transform, \Closure $reverseTransform)
     {
@@ -40,9 +43,9 @@ class CallbackTransformer implements DataTransformerInterface
     /**
      * Transforms a value from the original representation to a transformed representation.
      *
-     * @param  mixed $data               The value in the original representation
+     * @param mixed $data The value in the original representation
      *
-     * @return mixed                     The value in the transformed representation
+     * @return mixed The value in the transformed representation
      *
      * @throws UnexpectedTypeException   when the argument is not a string
      * @throws TransformationFailedException  when the transformation fails
@@ -56,9 +59,9 @@ class CallbackTransformer implements DataTransformerInterface
      * Transforms a value from the transformed representation to its original
      * representation.
      *
-     * @param  mixed $data               The value in the transformed representation
+     * @param mixed $data The value in the transformed representation
      *
-     * @return mixed                     The value in the original representation
+     * @return mixed The value in the original representation
      *
      * @throws UnexpectedTypeException   when the argument is not of the expected type
      * @throws TransformationFailedException  when the transformation fails

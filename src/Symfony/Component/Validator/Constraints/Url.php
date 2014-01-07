@@ -16,10 +16,12 @@ use Symfony\Component\Validator\Constraint;
 /**
  * @Annotation
  *
+ * @author Bernhard Schussek <bschussek@gmail.com>
+ *
  * @api
  */
 class Url extends Constraint
 {
-    public $message = 'This value is not a valid URL';
+    public $message = 'This value is not a valid URL.';
     public $protocols = array('http', 'https');
 }

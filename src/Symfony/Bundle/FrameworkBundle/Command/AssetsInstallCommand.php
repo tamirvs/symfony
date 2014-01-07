@@ -15,7 +15,6 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -26,22 +25,23 @@ use Symfony\Component\Finder\Finder;
 class AssetsInstallCommand extends ContainerAwareCommand
 {
     /**
-     * @see Command
+     * {@inheritdoc}
      */
     protected function configure()
     {
         $this
+            ->setName('assets:install')
             ->setDefinition(array(
-                new InputArgument('target', InputArgument::REQUIRED, 'The target directory (usually "web")'),
+                new InputArgument('target', InputArgument::OPTIONAL, 'The target directory', 'web'),
             ))
             ->addOption('symlink', null, InputOption::VALUE_NONE, 'Symlinks the assets instead of copying it')
             ->addOption('relative', null, InputOption::VALUE_NONE, 'Make relative symlinks')
             ->setDescription('Installs bundles web assets under a public web directory')
             ->setHelp(<<<EOT
-The <info>assets:install</info> command installs bundle assets into a given
+The <info>%command.name%</info> command installs bundle assets into a given
 directory (e.g. the web directory).
 
-<info>php app/console assets:install web</info>
+<info>php %command.full_name% web</info>
 
 A "bundles" directory will be created inside the target directory, and the
 "Resources/public" directory of each bundle will be copied into it.
@@ -49,22 +49,21 @@ A "bundles" directory will be created inside the target directory, and the
 To create a symlink to each bundle instead of copying its assets, use the
 <info>--symlink</info> option:
 
-<info>php app/console assets:install web --symlink</info>
+<info>php %command.full_name% web --symlink</info>
 
 To make symlink relative, add the <info>--relative</info> option:
 
-<info>php app/console assets:install web --symlink --relative</info>
+<info>php %command.full_name% web --symlink --relative</info>
 
 EOT
             )
-            ->setName('assets:install')
         ;
     }
 
     /**
-     * @see Command
+     * {@inheritdoc}
      *
-     * @throws \InvalidArgumentException When the target directory does not exist
+     * @throws \InvalidArgumentException When the target directory does not exist or symlink cannot be used
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -81,11 +80,13 @@ EOT
         $filesystem = $this->getContainer()->get('filesystem');
 
         // Create the bundles directory otherwise symlink will fail.
-        $filesystem->mkdir($targetArg.'/bundles/', 0777);
+        $bundlesDir = $targetArg.'/bundles/';
+        $filesystem->mkdir($bundlesDir, 0777);
+
+        $output->writeln(sprintf("Installing assets using the <comment>%s</comment> option", $input->getOption('symlink') ? 'symlink' : 'hard copy'));
 
         foreach ($this->getContainer()->get('kernel')->getBundles() as $bundle) {
             if (is_dir($originDir = $bundle->getPath().'/Resources/public')) {
-                $bundlesDir = $targetArg.'/bundles/';
                 $targetDir  = $bundlesDir.preg_replace('/bundle$/', '', strtolower($bundle->getName()));
 
                 $output->writeln(sprintf('Installing assets for <comment>%s</comment> into <comment>%s</comment>', $bundle->getNamespace(), $targetDir));
@@ -102,7 +103,7 @@ EOT
                 } else {
                     $filesystem->mkdir($targetDir, 0777);
                     // We use a custom iterator to ignore VCS files
-                    $filesystem->mirror($originDir, $targetDir, Finder::create()->in($originDir));
+                    $filesystem->mirror($originDir, $targetDir, Finder::create()->ignoreDotFiles(false)->in($originDir));
                 }
             }
         }

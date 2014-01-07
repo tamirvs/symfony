@@ -31,9 +31,9 @@ class PassConfig
     const TYPE_REMOVE = 'removing';
 
     private $mergePass;
-    private $afterRemovingPasses;
-    private $beforeOptimizationPasses;
-    private $beforeRemovingPasses;
+    private $afterRemovingPasses = array();
+    private $beforeOptimizationPasses = array();
+    private $beforeRemovingPasses = array();
     private $optimizationPasses;
     private $removingPasses;
 
@@ -43,10 +43,6 @@ class PassConfig
     public function __construct()
     {
         $this->mergePass = new MergeExtensionConfigurationPass();
-
-        $this->afterRemovingPasses = array();
-        $this->beforeOptimizationPasses = array();
-        $this->beforeRemovingPasses = array();
 
         $this->optimizationPasses = array(
             new ResolveDefinitionTemplatesPass(),
@@ -96,7 +92,7 @@ class PassConfig
      * Adds a pass.
      *
      * @param CompilerPassInterface $pass A Compiler pass
-     * @param string $type The pass type
+     * @param string                $type The pass type
      *
      * @throws InvalidArgumentException when a pass type doesn't exist
      *

@@ -23,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class CacheWarmupCommand extends ContainerAwareCommand
 {
     /**
-     * @see Command
+     * {@inheritdoc}
      */
     protected function configure()
     {
@@ -34,9 +34,14 @@ class CacheWarmupCommand extends ContainerAwareCommand
             ))
             ->setDescription('Warms up an empty cache')
             ->setHelp(<<<EOF
-The <info>cache:warmup</info> command warms up the cache.
+The <info>%command.name%</info> command warms up the cache.
 
 Before running this command, the cache must be empty.
+
+This command does not generate the classes cache (as when executing this
+command, too many classes that should be part of the cache are already loaded
+in memory). Use <comment>curl</comment> or any other similar tool to warm up
+the classes cache if you want.
 EOF
             )
         ;

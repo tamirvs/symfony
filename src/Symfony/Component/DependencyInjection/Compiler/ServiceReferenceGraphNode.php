@@ -24,22 +24,20 @@ use Symfony\Component\DependencyInjection\Alias;
 class ServiceReferenceGraphNode
 {
     private $id;
-    private $inEdges;
-    private $outEdges;
+    private $inEdges = array();
+    private $outEdges = array();
     private $value;
 
     /**
      * Constructor.
      *
-     * @param string $id The node identifier
-     * @param mixed $value The node value
+     * @param string $id    The node identifier
+     * @param mixed  $value The node value
      */
     public function __construct($id, $value)
     {
         $this->id = $id;
         $this->value = $value;
-        $this->inEdges = array();
-        $this->outEdges = array();
     }
 
     /**

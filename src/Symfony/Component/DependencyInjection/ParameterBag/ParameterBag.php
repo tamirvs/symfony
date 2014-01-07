@@ -24,8 +24,8 @@ use Symfony\Component\DependencyInjection\Exception\RuntimeException;
  */
 class ParameterBag implements ParameterBagInterface
 {
-    protected $parameters;
-    protected $resolved;
+    protected $parameters = array();
+    protected $resolved = false;
 
     /**
      * Constructor.
@@ -36,9 +36,7 @@ class ParameterBag implements ParameterBagInterface
      */
     public function __construct(array $parameters = array())
     {
-        $this->parameters = array();
         $this->add($parameters);
-        $this->resolved = false;
     }
 
     /**
@@ -84,7 +82,7 @@ class ParameterBag implements ParameterBagInterface
      *
      * @return mixed  The parameter value
      *
-     * @throws  ParameterNotFoundException if the parameter is not defined
+     * @throws ParameterNotFoundException if the parameter is not defined
      *
      * @api
      */
@@ -93,7 +91,19 @@ class ParameterBag implements ParameterBagInterface
         $name = strtolower($name);
 
         if (!array_key_exists($name, $this->parameters)) {
-            throw new ParameterNotFoundException($name);
+            if (!$name) {
+                throw new ParameterNotFoundException($name);
+            }
+
+            $alternatives = array();
+            foreach (array_keys($this->parameters) as $key) {
+                $lev = levenshtein($name, $key);
+                if ($lev <= strlen($name) / 3 || false !== strpos($key, $name)) {
+                    $alternatives[] = $key;
+                }
+            }
+
+            throw new ParameterNotFoundException($name, null, null, null, $alternatives);
         }
 
         return $this->parameters[$name];
@@ -115,7 +125,7 @@ class ParameterBag implements ParameterBagInterface
     /**
      * Returns true if a parameter name is defined.
      *
-     * @param  string  $name       The parameter name
+     * @param string $name The parameter name
      *
      * @return Boolean true if the parameter name is defined, false otherwise
      *
@@ -124,6 +134,18 @@ class ParameterBag implements ParameterBagInterface
     public function has($name)
     {
         return array_key_exists(strtolower($name), $this->parameters);
+    }
+
+    /**
+     * Removes a parameter.
+     *
+     * @param string $name The parameter name
+     *
+     * @api
+     */
+    public function remove($name)
+    {
+        unset($this->parameters[strtolower($name)]);
     }
 
     /**
@@ -154,7 +176,7 @@ class ParameterBag implements ParameterBagInterface
     /**
      * Replaces parameter placeholders (%name%) by their values.
      *
-     * @param mixed $value A value
+     * @param mixed $value     A value
      * @param array $resolving An array of keys that are being resolved (used internally to detect circular references)
      *
      * @return mixed The resolved value
@@ -212,7 +234,12 @@ class ParameterBag implements ParameterBagInterface
 
         $self = $this;
 
-        return preg_replace_callback('/(?<!%)%([^%\s]+)%/', function ($match) use ($self, $resolving, $value) {
+        return preg_replace_callback('/%%|%([^%\s]+)%/', function ($match) use ($self, $resolving, $value) {
+            // skip %%
+            if (!isset($match[1])) {
+                return '%%';
+            }
+
             $key = strtolower($match[1]);
             if (isset($resolving[$key])) {
                 throw new ParameterCircularReferenceException(array_keys($resolving));
@@ -236,7 +263,28 @@ class ParameterBag implements ParameterBagInterface
         return $this->resolved;
     }
 
-    private function unescapeValue($value)
+    /**
+     * {@inheritDoc}
+     */
+    public function escapeValue($value)
+    {
+        if (is_string($value)) {
+            return str_replace('%', '%%', $value);
+        }
+
+        if (is_array($value)) {
+            $result = array();
+            foreach ($value as $k => $v) {
+                $result[$k] = $this->escapeValue($v);
+            }
+
+            return $result;
+        }
+
+        return $value;
+    }
+
+    public function unescapeValue($value)
     {
         if (is_string($value)) {
             return str_replace('%%', '%', $value);

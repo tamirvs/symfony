@@ -12,22 +12,24 @@
 namespace Symfony\Bridge\Doctrine\Form;
 
 use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\ORM\Mapping\ClassMetadataInfo;
+use Doctrine\Common\Persistence\Mapping\MappingException;
+use Doctrine\ORM\Mapping\MappingException as LegacyMappingException;
 use Symfony\Component\Form\FormTypeGuesserInterface;
 use Symfony\Component\Form\Guess\Guess;
 use Symfony\Component\Form\Guess\TypeGuess;
 use Symfony\Component\Form\Guess\ValueGuess;
-use Doctrine\ORM\Mapping\MappingException;
+use Doctrine\Common\Util\ClassUtils;
 
 class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
 {
     protected $registry;
 
-    private $cache;
+    private $cache = array();
 
     public function __construct(ManagerRegistry $registry)
     {
         $this->registry = $registry;
-        $this->cache = array();
     }
 
     /**
@@ -48,10 +50,9 @@ class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
             return new TypeGuess('entity', array('em' => $name, 'class' => $mapping['targetEntity'], 'multiple' => $multiple), Guess::HIGH_CONFIDENCE);
         }
 
-        switch ($metadata->getTypeOfField($property))
-        {
-            //case 'array':
-            //  return new TypeGuess('Collection', array(), Guess::HIGH_CONFIDENCE);
+        switch ($metadata->getTypeOfField($property)) {
+            case 'array':
+                return new TypeGuess('collection', array(), Guess::MEDIUM_CONFIDENCE);
             case 'boolean':
                 return new TypeGuess('checkbox', array(), Guess::HIGH_CONFIDENCE);
             case 'datetime':
@@ -60,6 +61,8 @@ class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
                 return new TypeGuess('datetime', array(), Guess::HIGH_CONFIDENCE);
             case 'date':
                 return new TypeGuess('date', array(), Guess::HIGH_CONFIDENCE);
+            case 'time':
+                return new TypeGuess('time', array(), Guess::HIGH_CONFIDENCE);
             case 'decimal':
             case 'float':
                 return new TypeGuess('number', array(), Guess::MEDIUM_CONFIDENCE);
@@ -71,8 +74,6 @@ class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
                 return new TypeGuess('text', array(), Guess::MEDIUM_CONFIDENCE);
             case 'text':
                 return new TypeGuess('textarea', array(), Guess::MEDIUM_CONFIDENCE);
-            case 'time':
-                return new TypeGuess('time', array(), Guess::HIGH_CONFIDENCE);
             default:
                 return new TypeGuess('text', array(), Guess::LOW_CONFIDENCE);
         }
@@ -83,14 +84,39 @@ class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
      */
     public function guessRequired($class, $property)
     {
-        $ret = $this->getMetadata($class);
-        if ($ret && $ret[0]->hasField($property)) {
-            if (!$ret[0]->isNullable($property)) {
+        $classMetadatas = $this->getMetadata($class);
+
+        if (!$classMetadatas) {
+            return null;
+        }
+
+        /** @var ClassMetadataInfo $classMetadata */
+        $classMetadata = $classMetadatas[0];
+
+        // Check whether the field exists and is nullable or not
+        if ($classMetadata->hasField($property)) {
+            if (!$classMetadata->isNullable($property)) {
                 return new ValueGuess(true, Guess::HIGH_CONFIDENCE);
             }
 
             return new ValueGuess(false, Guess::MEDIUM_CONFIDENCE);
         }
+
+        // Check whether the association exists, is a to-one association and its
+        // join column is nullable or not
+        if ($classMetadata->isAssociationWithSingleJoinColumn($property)) {
+            $mapping = $classMetadata->getAssociationMapping($property);
+
+            if (!isset($mapping['joinColumns'][0]['nullable'])) {
+                // The "nullable" option defaults to true, in that case the
+                // field should not be required.
+                return new ValueGuess(false, Guess::HIGH_CONFIDENCE);
+            }
+
+            return new ValueGuess(!$mapping['joinColumns'][0]['nullable'], Guess::HIGH_CONFIDENCE);
+        }
+
+        return null;
     }
 
     /**
@@ -105,18 +131,31 @@ class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
             if (isset($mapping['length'])) {
                 return new ValueGuess($mapping['length'], Guess::HIGH_CONFIDENCE);
             }
+
+            if (in_array($ret[0]->getTypeOfField($property), array('decimal', 'float'))) {
+                return new ValueGuess(null, Guess::MEDIUM_CONFIDENCE);
+            }
         }
     }
 
     /**
      * {@inheritDoc}
      */
-    public function guessMinLength($class, $property)
+    public function guessPattern($class, $property)
     {
+        $ret = $this->getMetadata($class);
+        if ($ret && $ret[0]->hasField($property) && !$ret[0]->hasAssociation($property)) {
+            if (in_array($ret[0]->getTypeOfField($property), array('decimal', 'float'))) {
+                return new ValueGuess(null, Guess::MEDIUM_CONFIDENCE);
+            }
+        }
     }
 
     protected function getMetadata($class)
     {
+        // normalize class name
+        $class = ClassUtils::getRealClass(ltrim($class, '\\'));
+
         if (array_key_exists($class, $this->cache)) {
             return $this->cache[$class];
         }
@@ -127,6 +166,8 @@ class DoctrineOrmTypeGuesser implements FormTypeGuesserInterface
                 return $this->cache[$class] = array($em->getClassMetadata($class), $name);
             } catch (MappingException $e) {
                 // not an entity or mapped super class
+            } catch (LegacyMappingException $e) {
+                // not an entity or mapped super class, using Doctrine ORM 2.2
             }
         }
     }

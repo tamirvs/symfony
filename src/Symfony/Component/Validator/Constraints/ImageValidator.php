@@ -22,27 +22,33 @@ use Symfony\Component\Validator\Exception\ConstraintDefinitionException;
  */
 class ImageValidator extends FileValidator
 {
-    public function isValid($value, Constraint $constraint)
+    /**
+     * {@inheritDoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
-        $isValid = parent::isValid($value, $constraint);
-        if (!$isValid) {
-            return false;
-        }
+        $violations = count($this->context->getViolations());
 
-        if (null === $value || '' === $value) {
-            return true;
+        parent::validate($value, $constraint);
+
+        $failed = count($this->context->getViolations()) !== $violations;
+
+        if ($failed || null === $value || '' === $value) {
+            return;
         }
 
         if (null === $constraint->minWidth && null === $constraint->maxWidth
-            && null === $constraint->minHeight && null === $constraint->maxHeight) {
-            return true;
+            && null === $constraint->minHeight && null === $constraint->maxHeight
+            && null === $constraint->minRatio && null === $constraint->maxRatio
+            && $constraint->allowSquare && $constraint->allowLandscape && $constraint->allowPortrait) {
+            return;
         }
 
         $size = @getimagesize($value);
         if (empty($size) || ($size[0] === 0) || ($size[1] === 0)) {
             $this->context->addViolation($constraint->sizeNotDetectedMessage);
 
-            return false;
+            return;
         }
 
         $width  = $size[0];
@@ -59,7 +65,7 @@ class ImageValidator extends FileValidator
                     '{{ min_width }}' => $constraint->minWidth
                 ));
 
-                return false;
+                return;
             }
         }
 
@@ -74,7 +80,7 @@ class ImageValidator extends FileValidator
                     '{{ max_width }}' => $constraint->maxWidth
                 ));
 
-                return false;
+                return;
             }
         }
 
@@ -89,7 +95,7 @@ class ImageValidator extends FileValidator
                     '{{ min_height }}' => $constraint->minHeight
                 ));
 
-                return false;
+                return;
             }
         }
 
@@ -103,11 +109,57 @@ class ImageValidator extends FileValidator
                     '{{ height }}'    => $height,
                     '{{ max_height }}' => $constraint->maxHeight
                 ));
-
-                return false;
             }
         }
 
-        return true;
+        $ratio = $width / $height;
+
+        if (null !== $constraint->minRatio) {
+            if (!is_numeric((string) $constraint->minRatio)) {
+                throw new ConstraintDefinitionException(sprintf('"%s" is not a valid minimum ratio', $constraint->minRatio));
+            }
+
+            if ($ratio < $constraint->minRatio) {
+                $this->context->addViolation($constraint->minRatioMessage, array(
+                    '{{ ratio }}' => $ratio,
+                    '{{ min_ratio }}' => $constraint->minRatio
+                ));
+            }
+        }
+
+        if (null !== $constraint->maxRatio) {
+            if (!is_numeric((string) $constraint->maxRatio)) {
+                throw new ConstraintDefinitionException(sprintf('"%s" is not a valid maximum ratio', $constraint->maxRatio));
+            }
+
+            if ($ratio > $constraint->maxRatio) {
+                $this->context->addViolation($constraint->maxRatioMessage, array(
+                    '{{ ratio }}' => $ratio,
+                    '{{ max_ratio }}' => $constraint->maxRatio
+                ));
+            }
+        }
+
+        if (!$constraint->allowSquare && $width == $height) {
+            $this->context->addViolation($constraint->allowSquareMessage, array(
+                '{{ width }}' => $width,
+                '{{ height }}' => $height
+            ));
+        }
+
+        if (!$constraint->allowLandscape && $width > $height) {
+            $this->context->addViolation($constraint->allowLandscapeMessage, array(
+                '{{ width }}' => $width,
+                '{{ height }}' => $height
+            ));
+        }
+
+        if (!$constraint->allowPortrait && $width < $height) {
+            $this->context->addViolation($constraint->allowPortraitMessage, array(
+                '{{ width }}' => $width,
+                '{{ height }}' => $height
+            ));
+        }
+
     }
 }

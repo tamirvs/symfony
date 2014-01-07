@@ -11,6 +11,8 @@
 
 namespace Symfony\Component\Security\Acl\Model;
 
+use Symfony\Component\Security\Acl\Exception\NoAceFoundException;
+
 /**
  * This interface represents an access control list (ACL) for a domain object.
  * Each domain object can have exactly one associated ACL.
@@ -28,7 +30,7 @@ interface AclInterface extends \Serializable
      *
      * @return array
      */
-    function getClassAces();
+    public function getClassAces();
 
     /**
      * Returns all class-field-based ACEs associated with this ACL
@@ -36,14 +38,14 @@ interface AclInterface extends \Serializable
      * @param string $field
      * @return array
      */
-    function getClassFieldAces($field);
+    public function getClassFieldAces($field);
 
     /**
      * Returns all object-based ACEs associated with this ACL
      *
      * @return array
      */
-    function getObjectAces();
+    public function getObjectAces();
 
     /**
      * Returns all object-field-based ACEs associated with this ACL
@@ -51,28 +53,28 @@ interface AclInterface extends \Serializable
      * @param string $field
      * @return array
      */
-    function getObjectFieldAces($field);
+    public function getObjectFieldAces($field);
 
     /**
      * Returns the object identity associated with this ACL
      *
      * @return ObjectIdentityInterface
      */
-    function getObjectIdentity();
+    public function getObjectIdentity();
 
     /**
      * Returns the parent ACL, or null if there is none.
      *
      * @return AclInterface|null
      */
-    function getParentAcl();
+    public function getParentAcl();
 
     /**
      * Whether this ACL is inheriting ACEs from a parent ACL.
      *
      * @return Boolean
      */
-    function isEntriesInheriting();
+    public function isEntriesInheriting();
 
     /**
      * Determines whether field access is granted
@@ -83,7 +85,7 @@ interface AclInterface extends \Serializable
      * @param Boolean $administrativeMode
      * @return Boolean
      */
-    function isFieldGranted($field, array $masks, array $securityIdentities, $administrativeMode = false);
+    public function isFieldGranted($field, array $masks, array $securityIdentities, $administrativeMode = false);
 
     /**
      * Determines whether access is granted
@@ -94,7 +96,7 @@ interface AclInterface extends \Serializable
      * @param Boolean $administrativeMode
      * @return Boolean
      */
-    function isGranted(array $masks, array $securityIdentities, $administrativeMode = false);
+    public function isGranted(array $masks, array $securityIdentities, $administrativeMode = false);
 
     /**
      * Whether the ACL has loaded ACEs for all of the passed security identities
@@ -102,5 +104,5 @@ interface AclInterface extends \Serializable
      * @param mixed $securityIdentities an implementation of SecurityIdentityInterface, or an array thereof
      * @return Boolean
      */
-    function isSidLoaded($securityIdentities);
+    public function isSidLoaded($securityIdentities);
 }

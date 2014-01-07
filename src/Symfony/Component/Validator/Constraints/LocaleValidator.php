@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Validator\Constraints;
 
+use Symfony\Component\Intl\Intl;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -18,26 +19,19 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 /**
  * Validates whether a value is a valid locale code
  *
- * @author Bernhard Schussek <bernhard.schussek@symfony.com>
+ * @author Bernhard Schussek <bschussek@gmail.com>
  *
  * @api
  */
 class LocaleValidator extends ConstraintValidator
 {
     /**
-     * Checks if the passed value is valid.
-     *
-     * @param mixed      $value      The value that should be validated
-     * @param Constraint $constraint The constraint for the validation
-     *
-     * @return Boolean Whether or not the value is valid
-     *
-     * @api
+     * {@inheritDoc}
      */
-    public function isValid($value, Constraint $constraint)
+    public function validate($value, Constraint $constraint)
     {
         if (null === $value || '' === $value) {
-            return true;
+            return;
         }
 
         if (!is_scalar($value) && !(is_object($value) && method_exists($value, '__toString'))) {
@@ -45,13 +39,10 @@ class LocaleValidator extends ConstraintValidator
         }
 
         $value = (string) $value;
+        $locales = Intl::getLocaleBundle()->getLocaleNames();
 
-        if (!in_array($value, \Symfony\Component\Locale\Locale::getLocales())) {
+        if (!isset($locales[$value])) {
             $this->context->addViolation($constraint->message, array('{{ value }}' => $value));
-
-            return false;
         }
-
-        return true;
     }
 }
