@@ -27,7 +27,7 @@ use Symfony\Component\BrowserKit\CookieJar;
  */
 class Client extends BaseClient
 {
-    private $hasPerformedRequest = false;
+    protected $hasPerformedRequest = false;
     private $profiler = false;
 
     /**
@@ -97,16 +97,19 @@ class Client extends BaseClient
         // WebTestCase::createClient() boots the Kernel but do not handle a request
         if ($this->hasPerformedRequest) {
             $this->kernel->shutdown();
-        } else {
-            $this->hasPerformedRequest = true;
         }
+
+        $this->kernel->boot();
+
+        $this->manageContainer();
 
         if ($this->profiler) {
             $this->profiler = false;
 
-            $this->kernel->boot();
             $this->kernel->getContainer()->get('profiler')->enable();
         }
+
+        $this->hasPerformedRequest = true;
 
         return parent::doRequest($request);
     }
@@ -125,6 +128,11 @@ class Client extends BaseClient
         $this->profiler = false;
 
         return $response;
+    }
+
+    protected function manageContainer()
+    {
+        return;
     }
 
     /**
